@@ -855,6 +855,23 @@ Test-Case 'Turvallisuus: odottamaton kaatuminen WinPE:ssa ei kaynnista tikkua al
     Assert-True ($guard[0].Clauses[0].Item2.Extent.Text -notmatch 'wpeutil\.exe reboot') 'kaatumisen jalkeen uudelleenkaynnistys'
 }
 
+Test-Case 'Asennus: kayttoliittyman kieli valitaan kuvan kielista' {
+    Assert-True ((Select-UiLanguage -Wanted 'en-US' -Installed @('en-US')) -eq 'en-US') 'sama kieli'
+    Assert-True ((Select-UiLanguage -Wanted 'en-US' -Installed @('fi-FI')) -eq 'fi-FI') 'suomenkielinen ISO'
+    Assert-True ((Select-UiLanguage -Wanted 'fi-FI' -Installed @('en-US', 'fi-FI')) -eq 'fi-FI') 'monikielinen kuva'
+    Assert-True ((Select-UiLanguage -Wanted 'en-US' -Installed @()) -eq 'en-US') 'tuntematon: pyydetty'
+    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-lang-' + [guid]::NewGuid().ToString('N'))
+    try {
+        $s = Join-Path $tmp 'Windows\System32'
+        foreach ($d in @('fi-FI', 'en-US', 'Boot', 'zh-CN')) { New-Item -ItemType Directory -Path (Join-Path $s $d) -Force | Out-Null }
+        Set-Content -LiteralPath (Join-Path $s 'fi-FI\kernel32.dll.mui') -Value 'x'
+        Set-Content -LiteralPath (Join-Path $s 'zh-CN\kernel32.dll.mui') -Value 'x'
+        # en-US-kansio ilman kernel32.dll.mui:ta (osittainen kieli) ei ole kayttoliittymakieli.
+        $l = Get-OfflineUiLanguages -WindowsRoot $tmp
+        Assert-True (($l -join ',') -eq 'fi-FI,zh-CN') ("kielet: " + ($l -join ','))
+    } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 Test-Case 'Turvallisuus: harjoitustila pysahtyy ennen yhtakaan kirjoittavaa kutsua' {
     # Rakennetesti: tuleva muutos ei saa siirtaa levylle kirjoittavaa kutsua
     # harjoitustilan pysahdyksen eteen, eika laskuria/tarkistuksia sen jalkeen.

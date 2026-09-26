@@ -13,7 +13,7 @@
   },
 
   "Alue": {
-    "_Kayttoliittyma": "Asennuskuvan kieli. Kaytetaan vain, jos kuvassa on kyseinen kielipaketti.",
+    "_Kayttoliittyma": "Windowsin kieli. Jos asennuskuvassa ei ole tata kielta (esim. suomenkielinen ISO), kaytetaan kuvan omaa kielta automaattisesti.",
     "Kayttoliittyma": "en-US",
     "Alue": "fi-FI",
     "Nappaimisto": "040b:0000040b",

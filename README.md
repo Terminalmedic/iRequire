@@ -96,7 +96,7 @@ Tikun sisältö on tavallisia tiedostoja. Asetukset (`iRequire\Config\iRequire.j
 | Kohta | Mitä |
 |---|---|
 | `Kayttaja` | Paikallinen tili. Tyhjä salasana = suoraan työpöydälle. |
-| `Alue` | Alue, näppäimistö ja aikavyöhyke (oletus Suomi). |
+| `Alue` | Alue, näppäimistö ja aikavyöhyke (oletus Suomi). Windowsin kieli tulee ISOsta: suomenkielinen ISO = suomenkielinen Windows (kieli valitaan automaattisesti, jos asetus ja ISO eroavat). |
 | `Tyhjennys.LaskuriSekuntia` | Esc-ikkunan pituus (oletus 15 s, vähintään 5). |
 | `Tyhjennys.KaikkiSisaisetLevyt` | `true` = kaikki sisäiset levyt, `false` = vain asennuslevy. |
 | `Tyhjennys.Harjoitus` | `true` = mitään ei kirjoiteta, vain tarkistetaan. |

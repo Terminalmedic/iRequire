@@ -247,6 +247,12 @@ try {
     Write-IRequireLog "Laiteohjelmisto: $firmware, kohdelevy $($target.Number)"
     $parts = New-WindowsPartitions -Number $target.Number -Firmware $firmware -WorkDir $env:TEMP
     Install-WindowsImage -UsbRoot $UsbRoot -Target $parts.Windows
+    $langs = Get-OfflineUiLanguages -WindowsRoot $parts.Windows
+    $ui = Select-UiLanguage -Wanted ([string]$config.Alue.Kayttoliittyma) -Installed $langs
+    if ($ui -ne $config.Alue.Kayttoliittyma) {
+        Write-IRequireLog ("Kielta {0} ei ole asennuskuvassa ({1}): kaytetaan kielta {2}" -f $config.Alue.Kayttoliittyma, ($langs -join ', '), $ui) 'Varoitus'
+        $config.Alue.Kayttoliittyma = $ui
+    }
     Add-MachineDrivers -UsbRoot $UsbRoot -Target $parts.Windows
     Copy-Payload -UsbRoot $UsbRoot -Target $parts.Windows -Config $config -ReportsDir $reportDir
     Set-BootFiles -Windows $parts.Windows -System $parts.System -Firmware $firmware

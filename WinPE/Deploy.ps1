@@ -89,6 +89,27 @@ function Install-WindowsImage {
     if ($LASTEXITCODE -ne 0) { throw "Kuvan purku epaonnistui (DISM $LASTEXITCODE)" }
 }
 
+function Get-OfflineUiLanguages {
+    <# Puretun Windowsin kayttoliittymakielet: kansio System32\<kieli>,
+       jossa on kernel32.dll.mui. #>
+    param([Parameter(Mandatory)][string]$WindowsRoot)
+    $sys32 = Join-Path $WindowsRoot 'Windows\System32'
+    return @(Get-ChildItem -LiteralPath $sys32 -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^[a-z]{2,3}-[A-Z]{2}$' -and (Test-Path -LiteralPath (Join-Path $_.FullName 'kernel32.dll.mui')) } |
+        ForEach-Object { $_.Name } | Sort-Object)
+}
+
+function Select-UiLanguage {
+    <# Pyydetty kieli, jos se on kuvassa; muuten kuvan oma kieli. Vastaus-
+       tiedoston kieli, jota kuvassa ei ole, voi pysayttaa Windowsin
+       ensikaynnistyksen kysymaan kielta (esim. suomenkielinen ISO + en-US). #>
+    param([string]$Wanted, [string[]]$Installed = @())
+    $inst = @($Installed | Where-Object { $_ })
+    if ($inst.Count -eq 0) { return $Wanted }
+    foreach ($l in $inst) { if ($l -eq $Wanted) { return $l } }
+    return $inst[0]
+}
+
 function Test-StorageDriverInf {
     <# Onko INF tallennusohjaimen ajuri (esim. Intel RST/VMD, RAID)? Luokka
        luetaan [Version]-osiosta. Vain nama ladataan WinPE:hen: koko
