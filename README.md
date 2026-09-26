@@ -230,6 +230,8 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 - **Laskuri** näyttää levyn mallin, sarjanumeron, osiot ja käytetyn tilan, löydetyt Windows-asennukset (versio ja koneen nimi) sekä käyttäjätilien nimet. Esc peruu, eikä levyihin kosketa.
 - **Ulkoiset levyt** (USB, FireWire, muistikortit, verkkolevyt) ja tikku itse jätetään aina rauhaan, ja ne listataan ruudulla erikseen.
 - **Tikun eheys** tarkistetaan ennen tyhjennystä. Vioittunut kopio pysäyttää ajon ennen kuin mitään on menetetty.
+- **Asetustiedoston virheet** (tuntematon avain, väärä tyyppi, rikkinäinen JSON) pysäyttävät ajon ensimmäisenä. Muuten esimerkiksi kirjoitusvirhe `"Harjoitsu": true` johtaisi oikeaan tyhjennykseen harjoituksen sijaan.
+- **Odottamaton kaatuminen WinPE:ssä** pysäyttää koneen eikä käynnistä tikkua uudelleen alusta.
 - **Uudelleentyhjennyksen esto:** jos kone käynnistyy asennuksen jälkeen vahingossa taas tikulta, tikku tunnistaa keskeneräisen asennuksen ja käynnistää kiintolevyltä.
 - **Virheessä pysähdytään:** WinPE ei käynnisty uudelleen silmukkaan. Jälkiasennuksen tilakone yrittää vaihetta kahdesti, ohittaa sen sitten eikä voi jäädä uudelleenkäynnistyssilmukkaan (testattu simuloiduilla käynnistyksillä).
 - **Salasanat:** `Windows\Panther\unattend.xml` poistetaan heti, asetustiedosto lukitaan vain järjestelmänvalvojille ja poistetaan lopuksi, ja automaattinen kirjautuminen poistetaan salasanoineen (myös LSA-salaisuus `DefaultPassword`, jota pelkkä rekisteriarvon poisto ei poista).
