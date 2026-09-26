@@ -177,7 +177,9 @@ Xbox ja Microsoft Store poistetaan. Xbox-ohjainten langaton sovitin (`XboxGipSvc
 | HDD | Nollat koko levylle, yksi kierros | NIST 800-88 Clear, riittää kiintolevylle |
 | Tuntematon (VM, RAID) | Nollat + TRIM | Clear |
 
-**Varmistus.** Ennen tyhjennystä luetaan 256 satunnaista kohtaa (alku ja loppu aina mukana), ja tyhjennyksen jälkeen samat kohdat uudelleen. Laitteen omalle tyhjennykselle ei riitä, että se ilmoittaa onnistuneensa: jokaisen aiemmin dataa sisältäneen kohdan on oltava muuttunut. Muuten levy ylikirjoitetaan varalta.
+**Varmistus.** Levyltä valitaan 256 satunnaista kohtaa (alku ja loppu aina mukana), ja jokaiseen kirjoitetaan ennen tyhjennystä oma satunnainen **kanarialintu**. Tyhjennyksen jälkeen samat kohdat luetaan uudelleen:
+- **Ylikirjoitus:** jokaisessa kohdassa on oltava nollaa.
+- **Laitteen oma tyhjennys:** jokaisen kanarialinnun on kadottava. Laitteelle ei riitä, että se ilmoittaa onnistuneensa. Kanarialintujen ansiosta tämä ei riipu siitä, sattuvatko satunnaiset kohdat osumaan levyllä jo olevaan dataan. Ilman niitä lähes tyhjällä levyllä valehteleva laite menisi läpi sattumalta. Jos yksikin kanarialintu jää, levy ylikirjoitetaan varalta.
 
 **Hylkäys.** Levy hylätään, jos jokin kohta ei ole nollaa, sitä ei voi lukea tai jokin alue ei ota kirjoitusta vastaan (viallinen sektori). Hylätty levy estää asennuksen, ja todistukseen kirjataan syy ja ohje.
 

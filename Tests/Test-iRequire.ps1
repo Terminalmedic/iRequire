@@ -466,6 +466,21 @@ try {
         Assert-True (Test-FileAllZero) 'Levylle jai dataa'
     }
 
+    Test-Case 'Tyhjennys: valehteleva laite TYHJALLA levylla ei mene lapi (kanarialinnut)' {
+        # Lahes tyhja levy: satunnaisnaytteet eivat osu dataan, joten ilman
+        # kanarialintuja no-op-tyhjennys hyvaksyttaisiin. Salaisuus keskella.
+        $size = 24MB + 4096
+        $bytes = New-Object byte[] $size
+        $secret = [Text.Encoding]::ASCII.GetBytes('SALAISUUS-KESKELLA')
+        [Array]::Copy($secret, 0, $bytes, 12MB + 123, $secret.Length)
+        [System.IO.File]::WriteAllBytes($script:TestDisk, $bytes)
+        $d = [pscustomobject]@{ Number = 0; Model = 'Tyhja'; Serial = 'T2'; Size = [int64]$size; Bus = 'NVMe'; Kind = 'NVMe' }
+        $script:FirmwareMode = 'noop'
+        $r = Invoke-DiskWipe -Disk $d -SampleCount 8
+        Assert-True ($r.Menetelma -like 'Ylikirjoitus*') "Valehteleva laite hyvaksyttiin: $($r.Menetelma)"
+        Assert-True (Test-FileAllZero) 'Levylle jai dataa'
+    }
+
     Test-Case 'Tyhjennys SSD: komentoa ei tueta -> ylikirjoitus' {
         $d = New-TestDisk; $d.Kind = 'SSD'
         $script:FirmwareMode = 'unsupported'

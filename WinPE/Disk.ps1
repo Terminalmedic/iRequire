@@ -320,6 +320,34 @@ function Test-WipeResult {
     }
 }
 
+function Write-Canaries {
+    <# Kirjoittaa jokaiseen naytekohtaan tunnistettavan, kohtakohtaisen
+       satunnaislohkon ennen tyhjennysta. Tyhjennyksen jalkeen jokaisen on
+       kaduttava. Nain varmistus ei riipu siita, osuvatko satunnaiset
+       naytteet levylla jo olevaan dataan: lahes tyhjalla levylla laite,
+       joka vain vaittaa tyhjentaneensa, jaisi muuten kiinni vain sattumalta.
+       Levy tyhjennetaan joka tapauksessa, joten kirjoittaminen on vaaratonta. #>
+    param([Parameter(Mandatory)][int]$Number, [Parameter(Mandatory)][int64[]]$Offsets)
+    $seed = [int](Get-Random -Maximum 2147483647)
+    $buf = New-Object byte[] $script:SampleBytes
+    $written = 0
+    $fs = Open-RawDisk -Number $Number -Write
+    try {
+        foreach ($o in $Offsets) {
+            (New-Object System.Random ($seed -bxor [int]($o % 2147483647))).NextBytes($buf)
+            try {
+                [void]$fs.Seek($o, 'Begin')
+                $fs.Write($buf, 0, $buf.Length)
+                $written++
+            } catch { }
+        }
+        $fs.Flush()
+    } finally {
+        $fs.Dispose()
+    }
+    return $written
+}
+
 function Wait-DiskReadable {
     <# NVMe Sanitize voi jatkua laitteen sisalla viela kun komento on
        palannut; sen aikana luku epaonnistuu. Odotetaan kunnes levy vastaa. #>
@@ -532,6 +560,7 @@ function Invoke-DiskWipe {
         Yritykset    = @()
         Naytteita    = 0
         NaytteitaJoissaDataa = 0
+        Kanarialinnut = 0
         ViallisetAlueet = @()
         TaysiVarmistus = 'ei tehty'
         Varmistus    = 'EI TEHTY'
@@ -553,6 +582,10 @@ function Invoke-DiskWipe {
     Clear-DiskLayout -Number $Disk.Number
 
     $offsets = Get-SampleOffsets -Size $Disk.Size -Count $SampleCount
+    # Ensin katsotaan mita levylla oli (todistukseen), sitten kanarialinnut.
+    $original = Read-DiskSamples -Number $Disk.Number -Offsets $offsets
+    $record.NaytteitaJoissaDataa = @($original.ToArray() | Where-Object { -not $_.Zero -and -not $_.Error }).Count
+    $record.Kanarialinnut = Write-Canaries -Number $Disk.Number -Offsets $offsets
     $before = Read-DiskSamples -Number $Disk.Number -Offsets $offsets
     $unreadableBefore = @($before.ToArray() | Where-Object { $_.Error }).Count
     if ($unreadableBefore -eq $before.Count) {
@@ -575,7 +608,6 @@ function Invoke-DiskWipe {
                     $attempts.Add('Laitteen tyhjennys (IOCTL_STORAGE_REINITIALIZE_MEDIA): OK')
                     $record.Menetelma = if ($Disk.Kind -eq 'NVMe') { 'NVMe Sanitize, kryptografinen tyhjennys' } else { 'Laitteen oma tyhjennys' }
                     $record.Naytteita = $check.Samples
-                    $record.NaytteitaJoissaDataa = $check.HadData
                     return (& $finish 'HYVAKSYTTY' '')
                 }
                 $attempts.Add(("Laitteen tyhjennys: komento meni lapi mutta {0}/{1} naytetta ennallaan tai lukukelvottomia" -f $check.Failed, $check.Samples))
@@ -594,7 +626,6 @@ function Invoke-DiskWipe {
     $attempts.Add(('Ylikirjoitus nollilla: {0:hh\:mm\:ss}, {1} viallista aluetta, {2} hylattya naytetta' -f $ow.Elapsed, $ow.BadRanges.Count, $check.Failed))
     $record.Menetelma = 'Ylikirjoitus nollilla (1 kierros)'
     $record.Naytteita = $check.Samples
-    $record.NaytteitaJoissaDataa = $check.HadData
 
     $fullOk = $true
     if ($FullVerify) {
@@ -652,7 +683,7 @@ function Write-WipeCertificate {
         $t.Add(('  Vayla/tyyppi: {0} / {1}' -f $r.Vayla, $r.Tyyppi))
         $t.Add(('  Menetelma:    {0}' -f $r.Menetelma))
         $t.Add(('  Aika:         {0} - {1}' -f $r.Alkoi, $r.Paattyi))
-        $t.Add(('  Varmistus:    {0} ({1} satunnaista naytetta, joista {2} sisalsi dataa ennen tyhjennysta)' -f $r.Varmistus, $r.Naytteita, $r.NaytteitaJoissaDataa))
+        $t.Add(('  Varmistus:    {0} ({1} satunnaista kohtaa, joihin kirjoitettiin {2} kanarialintua; {3} kohdassa oli dataa ennen tyhjennysta)' -f $r.Varmistus, $r.Naytteita, $r.Kanarialinnut, $r.NaytteitaJoissaDataa))
         $t.Add(('  Takaisinluku: {0}' -f $r.TaysiVarmistus))
         if ($r.Huomio) { $t.Add(('  HUOMIO:       {0}' -f $r.Huomio)) }
         foreach ($a in $r.Yritykset) { $t.Add('    - ' + $a) }
