@@ -17,6 +17,7 @@ $base = Join-Path $env:SystemDrive 'iRequire'
 . (Join-Path $base 'Lib\Common.ps1')
 . (Join-Path $base 'Lib\Stages.ps1')
 . (Join-Path $base 'Lib\Tuning.ps1')
+. (Join-Path $base 'Lib\Readiness.ps1')
 
 $stateFile = Join-Path $base 'Logs\tila.json'
 $stages = @('Kaytannot', 'Palvelut', 'Poistot', 'Viritys', 'Verkko', 'Paivitykset', 'Sovellukset', 'Viimeistely')
@@ -329,7 +330,18 @@ function Write-Summary {
         $t.Add('Kaikilla laitteilla on toimiva ajuri.')
     }
     $t.Add('')
-    foreach ($line in (Get-SecuritySummary)) { $t.Add($line) }
+    $t.Add('PELIKUNTO')
+    $inputs = Get-GamingInputs
+    $timerFile = Join-Path $base 'Logs\ajastimet.txt'
+    $timers = if (Test-Path -LiteralPath $timerFile) { @(Get-Content -LiteralPath $timerFile) } else { @() }
+    $findings = Get-GamingFindings -Memory $inputs.Memory -Gpus $inputs.Gpus -HasBattery $inputs.HasBattery `
+        -SystemDiskKind $inputs.SystemDiskKind -TimerOverrides $timers
+    foreach ($level in @('Toimi', 'Huomio', 'OK')) {
+        foreach ($x in @($findings.ToArray() | Where-Object { $_.Taso -eq $level })) { $t.Add(('  [{0}] {1}' -f $x.Taso.ToUpper(), $x.Teksti)) }
+    }
+    $t.Add('')
+    $t.Add('TIETOTURVA JA ASETUKSET')
+    foreach ($line in (Get-SecuritySummary)) { $t.Add('  ' + $line) }
     $t.Add('')
     foreach ($gpu in @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)) {
         $t.Add(('Naytonohjain: {0} (ajuri {1})' -f $gpu.Name, $gpu.DriverVersion))
@@ -360,6 +372,9 @@ function Invoke-StageFinish {
         Write-IRequireLog 'Automaattinen kirjautuminen poistettu'
     }
 
+    # Uudet verkkoliitannat (esim. WLAN-ajuri paivityksista) saavat NetBIOSin
+    # oletuksena paalle, joten ajetaan uudelleen.
+    Disable-NetBios
     Write-Summary -State $State
     Remove-Item -LiteralPath (Join-Path $base 'ASENNUS-KESKEN.tag') -Force -ErrorAction SilentlyContinue
     # Salasanat eivat saa jaada koneelle.
@@ -380,7 +395,19 @@ function Invoke-StageFinish {
 # ==============================================================
 
 $state = Get-State
-if ($state.Valmis) { $mutex.ReleaseMutex(); exit 0 }
+if ($state.Valmis) {
+    # Ajastetut tehtavat jatetaan paikalleen kunnes kayttajan istunto on
+    # asettanut naytot (merkki), tai viikko on kulunut. Sitten siivotaan.
+    $marker = Join-Path $base 'Logs\naytto-valmis.txt'
+    $age = ((Get-Date) - (Get-Item -LiteralPath $stateFile).LastWriteTime).TotalDays
+    if ((Test-Path -LiteralPath $marker) -or $age -gt 7) {
+        Unregister-ScheduledTask -TaskName 'iRequire-edistys' -Confirm:$false -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName 'iRequire' -Confirm:$false -ErrorAction SilentlyContinue
+        Write-IRequireLog 'Ajastetut tehtavat poistettu, iRequire on valmis' 'Ok'
+    }
+    $mutex.ReleaseMutex()
+    exit 0
+}
 
 $handlers = @{
     'Kaytannot'   = { param($s) Set-Status $s 'Otetaan ryhmakaytannot kayttoon'; Invoke-StagePolicies }
@@ -398,8 +425,8 @@ try {
     switch ($result.Result) {
         'Reboot' { Restart-ForStage $state $result.Reason }
         default {
-            Unregister-ScheduledTask -TaskName 'iRequire' -Confirm:$false -ErrorAction SilentlyContinue
-            Unregister-ScheduledTask -TaskName 'iRequire-edistys' -Confirm:$false -ErrorAction SilentlyContinue
+            # Tehtavat poistetaan vasta seuraavalla kaynnistyksella, kun
+            # kayttajan istunto on ehtinyt asettaa naytot (ks. alku).
             Write-IRequireLog ('Jalkiasennus paattyi: ' + $result.Reason) 'Ok'
             if ($result.Result -eq 'Done') { Restart-ForStage $state 'asennus valmis' }
         }

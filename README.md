@@ -20,7 +20,8 @@ Windows
  ├─ 9. Pelikoneen viritys: virrankäyttö, GPU-ajoitus, Game Mode, tietoturva (ks. alla)
  ├─ 10. Windows Update + ajurit, kierroksittain uudelleenkäynnistysten yli
  ├─ 11. Visual C++ ja DirectX-kirjastot, halutessa Firefox. Allekirjoitukset tarkistetaan.
- └─ 12. Yhteenveto: tietoturvan tila, puuttuvat ajurit, näytönohjainsuositus
+ ├─ 12. Yhteenveto: pelikuntoraportti (XMP, dual channel, näyttökaapeli ...), tietoturvan tila
+ └─ 13. Kirjautuessa: näytöt suurimmalle virkistystaajuudelle
 ```
 
 ## Ensimmäinen kerta: näin varmistat että se toimii
@@ -100,6 +101,9 @@ Periaate: vain muutoksia, joiden hyöty on mitattu tai Microsoftin dokumentoima.
 | **Toimitusoptimointi pois** | Kone ei jaa päivityksiä muille koneille internetissä, joten lähetyskaista ei kulu. |
 | **Telemetria, mainokset, Copilot, Widgets, Store, Xbox pois** | Vähemmän taustaprosesseja ja verkkoliikennettä. |
 | **.NET 3.5** (kuvassa valmiina), **Visual C++**, **DirectX 9–11 -lisäkirjastot** | Vanhemmat pelit ja niiden asennusohjelmat toimivat heti. |
+| **Näytöt suurimmalle virkistystaajuudelle** | Yleisin pelikoneen virhe on 144/165/240 Hz:n näyttö 60 Hz:llä. Taajuus nostetaan näytön itse ilmoittamaan suurimpaan taajuuteen, ja tila testataan ensin. Asetus tehdään vain asennuksen aikana, sen jälkeen käyttäjä päättää itse. |
+| **Laitteiden virransäästö pois** (pöytäkone) | USB-hiiri, näppäimistö ja verkkokortti eivät nukahda, joten niistä ei tule viivepiikkejä. |
+| **Pakotetut ajastinasetukset pois** (`useplatformclock` ym.) | Microsoft dokumentoi ne vain vianetsintään. Pakotettu HPET hidastaa ajastinkutsuja moninkertaisesti ja on mitattu heikentävän FPS:ää. |
 
 **Tietoturva pysyy päällä:** Defender, palomuuri, SmartScreen, UAC, Secure Boot ja muistin eheys (HVCI), jos laite tukee. Lisäksi:
 - Defenderin PUA-esto
@@ -110,6 +114,45 @@ Periaate: vain muutoksia, joiden hyöty on mitattu tai Microsoftin dokumentoima.
 - Automaattinen laitesalaus estetty, koska sen avain katoaisi paikallisella tilillä. BitLocker on valittavissa asetuksella `Tietoturva.BitLocker`, jolloin avain tallennetaan tikulle.
 
 Testit estävät, ettei mikään näistä kytkeydy vahingossa pois.
+
+### Pelikuntoraportti
+
+Suurimmat suorituskykyerot tulevat laitteistosta ja BIOSista, joita mikään Windows-säätö ei korvaa. `yhteenveto.txt` kertoo lopuksi:
+
+- **[TOIMI] RAM perusnopeudella:** XMP tai EXPO on pois päältä. Prosessorisidonnaisissa peleissä tämä on usein kymmenien prosenttien ero, ja korjaus on yksi BIOS-asetus.
+- **[TOIMI] Yksi muistikampa:** muisti toimii yksikanavaisena, jolloin muistikaista on puolet pienempi.
+- **[TOIMI] Näyttö kytketty emolevyyn:** pelit pyörivät integroidulla grafiikalla, vaikka koneessa on erillinen näytönohjain.
+- **[TOIMI] Ei näytönohjaimen ajuria,** tai **Windows kiintolevyllä.**
+- **[HUOMIO]** Näyttö ei toimi suurimmalla taajuudellaan, esimerkiksi HDMI 1.4 -kaapelin takia.
+- **Tietoturvan tila:** Defender, palomuuri, HVCI, Secure Boot ja BitLocker.
+
+### Ammattilaisoptimoijien säädöt: mitä testit sanovat
+
+Lähteinä on käytetty mittauksiin perustuvia oppaita ([valleyofdoom/PC-Tuning](https://github.com/valleyofdoom/PC-Tuning), [djdallmann/GamingPCSetup](https://github.com/djdallmann/GamingPCSetup)), Microsoftin dokumentaatiota ja riippumattomia testejä.
+
+| Säätö | Päätös | Miksi |
+|---|---|---|
+| Suurin virkistystaajuus | ✅ tehdään | Suurin näkyvä parannus: pienempi viive ja sulavampi kuva. |
+| XMP/EXPO, dual channel | 📋 tarkistetaan | Mitattu suureksi, mutta vain BIOSista korjattavissa. |
+| Game Mode, HAGS, flip model | ✅ tehdään | Microsoftin dokumentoimat. Game Mode estää Windows Updaten pelin aikana. |
+| Laitteiden virransäästö pois | ✅ pöytäkoneessa | Poistaa laitteiden heräämisviiveet. Kannettavassa kuluttaisi akkua. |
+| Game DVR pois, hiiren kiihdytys pois | ✅ tehdään | Taustatallennus vie GPU-aikaa. Lineaarinen tähtäys. |
+| NetBIOS pois | ✅ tehdään | Turha kuunteleva palvelu, joka on myös hyökkäyspinta. |
+| HPET / `useplatformclock` / `disabledynamictick` | ❌ poistetaan jos asetettu | Microsoft: vain vianetsintään. Pakotettu HPET on mitattu hidastavan. |
+| Ajastimen tarkkuus (`GlobalTimerResolutionRequests`) | ❌ ei | Windows 11 antaa tarkkuuden pelille itselleen. Globaali tarkkuus lisää kaikkien taustaprosessien kuormaa. |
+| CPU:n lepotilojen (C-state) poisto | ❌ ei | Lämpenee ja estää turbon nousun. Haitallinen, ellei kellotaajuutta ole lukittu. |
+| Sivutustiedoston poisto | ❌ ei | Aiheuttaa nykimistä osassa peleistä, vaikka muistia olisi vapaana. |
+| Spectre/Meltdown-suojausten poisto | ❌ ei | Uusilla prosessoreilla ei hyötyä tai jopa hidastaa, ja avaa aukot. |
+| Muistin eheyden (HVCI/VBS) poisto | ❌ ei | Muutaman prosentin hyöty CPU-sidonnaisissa peleissä ei ole ytimen suojauksen arvoinen. |
+| MSI-tilan pakotus | ❌ ei automaattisesti | Ajurit asettavat sen jo tukevilla laitteilla. Pakotus tukemattomalle laitteelle aiheuttaa sinisen ruudun. |
+| USB-keskeytysten (XHCI IMOD) säätö | ❌ ei | Vaatii haavoittuvien ajurien estolistan poiston, ja osa anti-cheat-järjestelmistä estää pelin. |
+| Nagle, "network throttling", `Win32PrioritySeparation`, ydinten "vapautus" | ❌ ei | Ei mitattua hyötyä nykyisissä Windows-versioissa ja peleissä, joten ne ovat plaseboa. |
+| "Standby list cleaner" | ❌ ei | Korjasi Windows 10 1803:n bugin, jota ei enää ole. |
+
+**Mitä kannattaa tehdä itse** (pelikohtaista, ei automatisoitavissa):
+- **NVIDIA Reflex** tai **AMD Anti-Lag** pelin asetuksista, jos peli tukee sitä.
+- **Ruudunpäivitysraja** hieman näytön taajuuden alle, esimerkiksi 141 FPS 144 Hz:llä, jos käytössä on G-Sync tai FreeSync.
+- **Hiiren raportointitaajuus** 1000 Hz tai enemmän.
 
 **Mitä ei tehdä, tarkoituksella:**
 - **HPET- tai ajastinsäädöt, Nagle-, "network throttling"- ja ydinten "vapautus" -säädöt:** plaseboa tai haitallisia nykyisillä Windows-versioilla.

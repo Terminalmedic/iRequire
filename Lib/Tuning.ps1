@@ -121,6 +121,44 @@ function Enable-BitLockerWithUsbKey {
     Write-IRequireLog "BitLocker kaytossa, palautusavain tikulla: $file" 'Ok'
 }
 
+function Remove-TimerOverrides {
+    <# Poistaa pakotetut ajastinasetukset (useplatformclock ym.). Puhtaassa
+       asennuksessa niita ei ole, mutta tarkistus on halpa ja varmistaa ettei
+       mikaan ajuri tai tyokalu ole asettanut niita. Palauttaa poistetut. #>
+    $text = (& bcdedit.exe /enum '{current}') -join "`n"
+    $found = Get-TimerOverrides -BcdText $text
+    foreach ($name in $found) {
+        & bcdedit.exe /deletevalue '{current}' $name | Out-Null
+        Write-IRequireLog "Poistettu pakotettu ajastinasetus: $name" 'Ok'
+    }
+    return ,$found
+}
+
+function Disable-DevicePowerSaving {
+    <# "Salli tietokoneen sammuttaa tama laite virran saastamiseksi" pois
+       kaikilta laitteilta. Estaa USB-hiiren, nappaimiston ja verkkokortin
+       nukahtamisen, joka nakyy viiveena tai katkoksina. Vain poytakoneissa:
+       kannettavassa se kuluttaisi akkua. #>
+    $n = 0
+    foreach ($d in @(Get-CimInstance -Namespace root\wmi -ClassName MSPower_DeviceEnable -ErrorAction SilentlyContinue)) {
+        if (-not $d.Enable) { continue }
+        try { Set-CimInstance -InputObject $d -Property @{ Enable = $false } -ErrorAction Stop; $n++ } catch { }
+    }
+    Write-IRequireLog "Laitteiden virransaasto pois: $n laitetta"
+}
+
+function Disable-NetBios {
+    <# NetBIOS over TCP/IP pois: kuuntelee turhaan portteja 137-139 ja on
+       vanha hyokkayspinta. Kotikoneessa sita ei tarvita mihinkaan. #>
+    $n = 0
+    $base = 'HKLM:\SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces'
+    foreach ($k in @(Get-ChildItem -LiteralPath $base -ErrorAction SilentlyContinue)) {
+        Set-ItemProperty -LiteralPath $k.PSPath -Name 'NetbiosOptions' -Value 2 -Type DWord
+        $n++
+    }
+    Write-IRequireLog "NetBIOS pois: $n verkkoliitantaa"
+}
+
 function Invoke-StageTuning {
     <# Suorituskyky- ja tietoturvaviritys. Jokainen kohta on turvallista
        ajaa uudelleen. #>
@@ -166,6 +204,14 @@ function Invoke-StageTuning {
     } else {
         Write-IRequireLog ("Aktiiviset tunnit {0}-{1} eivat kelpaa (enintaan 18 h), ohitetaan" -f $start, $end) 'Varoitus'
     }
+
+    $removed = Remove-TimerOverrides
+    if ($removed.Count -gt 0) {
+        # Yhteenveto kirjoitetaan myohemmalla kaynnistyksella, joten talteen tiedostoon.
+        $removed.ToArray() | Set-Content -LiteralPath (Join-Path $env:SystemDrive 'iRequire\Logs\ajastimet.txt') -Encoding ASCII
+    }
+    if (-not $hasBattery) { Disable-DevicePowerSaving }
+    Disable-NetBios
 
     if ($Config.Tietoturva.BitLocker) {
         try { Enable-BitLockerWithUsbKey -UsbRoot $UsbRoot } catch { Write-IRequireLog ('BitLocker: ' + $_.Exception.Message) 'Varoitus' }

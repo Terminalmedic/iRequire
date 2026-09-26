@@ -211,6 +211,8 @@ function Test-Deployment {
         "$Windows\iRequire\Lib\Common.ps1",
         "$Windows\iRequire\Lib\Stages.ps1",
         "$Windows\iRequire\Lib\Tuning.ps1",
+        "$Windows\iRequire\Lib\Readiness.ps1",
+        "$Windows\iRequire\Lib\Display.ps1",
         "$Windows\iRequire\Config\iRequire.json",
         "$Windows\iRequire\Policies\Debloat.json"
     )

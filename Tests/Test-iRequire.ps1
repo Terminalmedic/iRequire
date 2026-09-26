@@ -39,6 +39,8 @@ Write-Host '=== iRequire-tarkistukset ===' -ForegroundColor Cyan
 . (Join-Path $root 'Lib\Media.ps1')
 . (Join-Path $root 'Lib\Stages.ps1')
 . (Join-Path $root 'Lib\Tuning.ps1')
+. (Join-Path $root 'Lib\Readiness.ps1')
+. (Join-Path $root 'Lib\Display.ps1')
 . (Join-Path $root 'WinPE\Disk.ps1')
 . (Join-Path $root 'WinPE\Deploy.ps1')
 
@@ -69,7 +71,7 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
         'Start-VM','Stop-Service','Unregister-ScheduledTask','Update-MpSignature','Update-Disk',
         'Enable-WindowsOptionalFeature','Get-Tpm','Get-BitLockerVolume','Add-BitLockerKeyProtector',
         'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-NetFirewallProfile',
-        'Confirm-SecureBootUEFI')
+        'Confirm-SecureBootUEFI','Set-CimInstance')
     $defined = @{}
     $calls = @{}
     foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.ps1)) {
@@ -295,7 +297,7 @@ Test-Case 'Asennuksen lopputarkistus huomaa puuttuvan tiedoston' {
     try {
         $files = @("$w\Windows\System32\config\SYSTEM", "$w\Windows\System32\winload.efi", "$w\Windows\Panther\unattend.xml",
                    "$w\Windows\Setup\Scripts\SetupComplete.cmd", "$w\iRequire\PostInstall\Invoke-PostInstall.ps1",
-                   "$w\iRequire\Lib\Common.ps1", "$w\iRequire\Lib\Stages.ps1", "$w\iRequire\Lib\Tuning.ps1", "$w\iRequire\Config\iRequire.json", "$w\iRequire\Policies\Debloat.json",
+                   "$w\iRequire\Lib\Common.ps1", "$w\iRequire\Lib\Stages.ps1", "$w\iRequire\Lib\Tuning.ps1", "$w\iRequire\Lib\Readiness.ps1", "$w\iRequire\Lib\Display.ps1", "$w\iRequire\Config\iRequire.json", "$w\iRequire\Policies\Debloat.json",
                    "$sy\EFI\Microsoft\Boot\bootmgfw.efi", "$sy\EFI\Microsoft\Boot\BCD")
         foreach ($f in $files) { New-Item -ItemType File -Path $f -Force | Out-Null }
         Test-Deployment -Windows $w -System $sy -Firmware UEFI
@@ -521,6 +523,82 @@ Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScree
     foreach ($svc in @('WinDefend', 'mpssvc', 'SecurityHealthService', 'wscsvc', 'Sense', 'WdNisSvc')) {
         Assert-True ($d.Palvelut -notcontains $svc) "Tietoturvapalvelu $svc poistolistalla"
     }
+}
+
+Test-Case 'Naytto: suurin taajuus samalla tarkkuudella, ei lomitettuja' {
+    $cur = [pscustomobject]@{ Width = 2560; Height = 1440; Bpp = 32; Hz = 60; Flags = 0 }
+    $modes = @(
+        [pscustomobject]@{ Width = 2560; Height = 1440; Bpp = 32; Hz = 60; Flags = 0 },
+        [pscustomobject]@{ Width = 2560; Height = 1440; Bpp = 32; Hz = 144; Flags = 0 },
+        [pscustomobject]@{ Width = 2560; Height = 1440; Bpp = 32; Hz = 165; Flags = 0 },
+        [pscustomobject]@{ Width = 2560; Height = 1440; Bpp = 32; Hz = 200; Flags = 2 },
+        [pscustomobject]@{ Width = 1920; Height = 1080; Bpp = 32; Hz = 240; Flags = 0 },
+        [pscustomobject]@{ Width = 2560; Height = 1440; Bpp = 16; Hz = 180; Flags = 0 }
+    )
+    $b = Select-BestDisplayMode -Current $cur -Modes $modes
+    Assert-True ($b.Hz -eq 165) "Valittiin $($b.Hz) Hz"
+    $cur.Hz = 165
+    Assert-True ($null -eq (Select-BestDisplayMode -Current $cur -Modes $modes)) 'Jo suurin, silti vaihto'
+}
+
+Test-Case 'Naytto: Win32-rakenteet kaantyvat ja ovat oikean kokoisia' {
+    Initialize-DisplayApi
+    $dm = [IRequireDisplay]::NewDevMode()
+    Assert-True ($dm.dmSize -eq 220) "DEVMODEW on 220 tavua, nyt $($dm.dmSize)"
+    $dd = [IRequireDisplay]::NewDisplayDevice()
+    Assert-True ($dd.cb -eq 840) "DISPLAY_DEVICEW on 840 tavua, nyt $($dd.cb)"
+}
+
+Test-Case 'Pelikunto: XMP pois, yksi kampa, naytto emolevyssa, HDD, ajastimet' {
+    $mem = @([pscustomobject]@{ Type = 34; Configured = 4800; CapacityGb = 16 })
+    $gpus = @(
+        [pscustomobject]@{ Name = 'NVIDIA GeForce RTX 4070'; Active = $false; CurrentHz = 0; MaxHz = 0; Basic = $false },
+        [pscustomobject]@{ Name = 'Intel(R) UHD Graphics 770'; Active = $true; CurrentHz = 60; MaxHz = 144; Basic = $false }
+    )
+    $f = Get-GamingFindings -Memory $mem -Gpus $gpus -HasBattery $false -SystemDiskKind 'HDD' -TimerOverrides @('useplatformclock')
+    $t = ($f.ToArray() | ForEach-Object { "$($_.Taso): $($_.Teksti)" }) -join "`n"
+    Assert-True ($t -match 'Toimi: RAM toimii perusnopeudella DDR5 4800') 'XMP puuttuu'
+    Assert-True ($t -match 'Toimi: Vain yksi muistikampa') 'Yksi kampa puuttuu'
+    Assert-True ($t -match 'Toimi: Naytto on kytketty emolevyn') 'iGPU-kytkenta puuttuu'
+    Assert-True ($t -match 'Huomio: Naytto .* 60 Hz, suurin tuettu 144') 'Taajuus puuttuu'
+    Assert-True ($t -match 'Toimi: Windows on kiintolevylla') 'HDD puuttuu'
+    Assert-True ($t -match 'useplatformclock') 'Ajastin puuttuu'
+}
+
+Test-Case 'Pelikunto: kunnossa oleva kone ei saa aiheettomia varoituksia' {
+    $mem = @([pscustomobject]@{ Type = 34; Configured = 6000; CapacityGb = 16 }, [pscustomobject]@{ Type = 34; Configured = 6000; CapacityGb = 16 })
+    $gpus = @(
+        [pscustomobject]@{ Name = 'AMD Radeon RX 7800 XT'; Active = $true; CurrentHz = 165; MaxHz = 165; Basic = $false },
+        [pscustomobject]@{ Name = 'AMD Radeon(TM) Graphics'; Active = $false; CurrentHz = 0; MaxHz = 0; Basic = $false }
+    )
+    $f = Get-GamingFindings -Memory $mem -Gpus $gpus -HasBattery $false -SystemDiskKind 'SSD'
+    $bad = @($f.ToArray() | Where-Object { $_.Taso -ne 'OK' })
+    Assert-True ($bad.Count -eq 0) ('Aiheettomia: ' + (($bad | ForEach-Object { $_.Teksti }) -join ' | '))
+    Assert-True (Test-DiscreteGpuName 'AMD Radeon RX 7800 XT') 'RX erillisnaytonohjaimeksi'
+    Assert-True (-not (Test-DiscreteGpuName 'AMD Radeon(TM) Graphics')) 'Integroitu Radeon ei ole erillinen'
+    Assert-True (Test-DiscreteGpuName 'Intel(R) Arc(TM) A770 Graphics') 'Arc erillisnaytonohjaimeksi'
+    foreach ($igpu in @('AMD Radeon 780M Graphics', 'AMD Radeon(TM) Vega 8 Graphics', 'Intel(R) UHD Graphics 770', 'Intel(R) Iris(R) Xe Graphics', 'Intel(R) Arc(TM) Graphics')) {
+        Assert-True (-not (Test-DiscreteGpuName $igpu)) "$igpu tulkittiin erilliseksi"
+    }
+    foreach ($dgpu in @('NVIDIA GeForce GTX 1060 6GB', 'AMD Radeon RX 6600', 'AMD Radeon R9 290', 'NVIDIA RTX A2000')) {
+        Assert-True (Test-DiscreteGpuName $dgpu) "$dgpu ei tunnistettu erilliseksi"
+    }
+}
+
+Test-Case 'Pelikunto: kannettavan Optimus-kytkenta ei ole virhe' {
+    $gpus = @(
+        [pscustomobject]@{ Name = 'NVIDIA GeForce RTX 4060 Laptop GPU'; Active = $false; CurrentHz = 0; MaxHz = 0; Basic = $false },
+        [pscustomobject]@{ Name = 'Intel(R) Iris(R) Xe Graphics'; Active = $true; CurrentHz = 144; MaxHz = 144; Basic = $false }
+    )
+    $f = Get-GamingFindings -Gpus $gpus -HasBattery $true
+    Assert-True (@($f.ToArray() | Where-Object { $_.Teksti -match 'emolevyn' }).Count -eq 0) 'Kannettavalle aiheeton varoitus'
+}
+
+Test-Case 'Ajastimet: pakotetut asetukset tunnistetaan bcdeditin tulosteesta' {
+    $bcd = "identifier              {current}`ndevice                  partition=C:`nuseplatformclock        Yes`ndisabledynamictick      Yes`nnx                      OptIn"
+    $found = Get-TimerOverrides -BcdText $bcd
+    Assert-True (($found -join ',') -eq 'useplatformclock,disabledynamictick') "Loytyi: $($found -join ',')"
+    Assert-True ((Get-TimerOverrides -BcdText "identifier {current}`nnx OptIn").Count -eq 0) 'Oletuksessa loytyi jotain'
 }
 
 Test-Case 'Tilakone: kaikki vaiheet kerran, yksi kaynnistys' {
