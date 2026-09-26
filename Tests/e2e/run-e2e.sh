@@ -190,6 +190,7 @@ check 'Secure Boot paalla (tikku kaynnistyi Secure Bootilla)' "grep -a -q 'Secur
 check 'TPM valmis' "grep -a -q 'TPM: valmis' out/Reports/yhteenveto.txt"
 check 'Pelikunto: huijauksenestojen vaatimukset tayttyvat' "grep -a -q 'Secure Boot ja TPM 2.0 paalla' out/Reports/yhteenveto.txt"
 check 'Keskeneraisen asennuksen merkki poistettu' "grep -q 'PostInstall' out/ls_iRequire.txt && ! grep -q 'ASENNUS-KESKEN.tag' out/ls_iRequire.txt"
+check 'C:\\iRequire lukittu, kayttajalle oma kansio (Register-PostInstall)' "grep -qx 'Kayttaja' out/ls_iRequire.txt"
 check 'Selvakielinen unattend.xml poistettu' "! grep -q '__LUKUVIRHE__' out/ls_Windows_Panther.txt && ! grep -qix 'unattend.xml' out/ls_Windows_Panther.txt"
 check 'Asetustiedosto (salasanat) poistettu' "! grep -q '__LUKUVIRHE__' out/ls_iRequire_Config.txt && ! grep -q 'iRequire.json' out/ls_iRequire_Config.txt"
 

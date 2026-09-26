@@ -271,3 +271,60 @@ function Get-SecuritySummary {
     } catch { }
     return ,$lines
 }
+
+function Initialize-LsaApi {
+    if ('IRequireLsa' -as [type]) { return }
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class IRequireLsa {
+    [StructLayout(LayoutKind.Sequential)]
+    struct LSA_UNICODE_STRING { public ushort Length; public ushort MaximumLength; public IntPtr Buffer; }
+    [StructLayout(LayoutKind.Sequential)]
+    struct LSA_OBJECT_ATTRIBUTES { public int Length; public IntPtr RootDirectory; public IntPtr ObjectName; public uint Attributes; public IntPtr SecurityDescriptor; public IntPtr SecurityQualityOfService; }
+    [DllImport("advapi32.dll")] static extern uint LsaOpenPolicy(IntPtr systemName, ref LSA_OBJECT_ATTRIBUTES attributes, uint access, out IntPtr handle);
+    [DllImport("advapi32.dll")] static extern uint LsaRetrievePrivateData(IntPtr handle, ref LSA_UNICODE_STRING keyName, out IntPtr data);
+    [DllImport("advapi32.dll")] static extern uint LsaStorePrivateData(IntPtr handle, ref LSA_UNICODE_STRING keyName, IntPtr data);
+    [DllImport("advapi32.dll")] static extern uint LsaFreeMemory(IntPtr buffer);
+    [DllImport("advapi32.dll")] static extern uint LsaClose(IntPtr handle);
+    [DllImport("advapi32.dll")] static extern int LsaNtStatusToWinError(uint status);
+    const uint POLICY_GET_PRIVATE_INFORMATION = 0x4;
+    const uint POLICY_CREATE_SECRET = 0x20;
+    const uint STATUS_OBJECT_NAME_NOT_FOUND = 0xC0000034;
+    // 0 = poistettu, 1 = ei ollut olemassa, muu = Win32-virhekoodi
+    public static int Clear(string name) {
+        LSA_OBJECT_ATTRIBUTES attributes = new LSA_OBJECT_ATTRIBUTES();
+        attributes.Length = Marshal.SizeOf(typeof(LSA_OBJECT_ATTRIBUTES));
+        IntPtr handle;
+        uint status = LsaOpenPolicy(IntPtr.Zero, ref attributes, POLICY_GET_PRIVATE_INFORMATION | POLICY_CREATE_SECRET, out handle);
+        if (status != 0) { return LsaNtStatusToWinError(status); }
+        LSA_UNICODE_STRING key = new LSA_UNICODE_STRING();
+        key.Buffer = Marshal.StringToHGlobalUni(name);
+        key.Length = (ushort)(name.Length * 2);
+        key.MaximumLength = (ushort)(key.Length + 2);
+        try {
+            IntPtr data;
+            status = LsaRetrievePrivateData(handle, ref key, out data);
+            if (status == STATUS_OBJECT_NAME_NOT_FOUND) { return 1; }
+            if (data != IntPtr.Zero) { LsaFreeMemory(data); }
+            // NULL poistaa salaisuuden (LsaStorePrivateData-dokumentaatio).
+            status = LsaStorePrivateData(handle, ref key, IntPtr.Zero);
+            return status == 0 ? 0 : LsaNtStatusToWinError(status);
+        } finally {
+            Marshal.FreeHGlobal(key.Buffer);
+            LsaClose(handle);
+        }
+    }
+}
+"@
+}
+
+function Clear-AutoLogonSecret {
+    <# Automaattisen kirjautumisen salasana ei ole rekisterissa vaan LSA-
+       salaisuutena (DefaultPassword), kun se tulee vastaustiedostosta.
+       Rekisteriarvon poisto ei siis riita. Palauttaa: 0 poistettu,
+       1 ei ollut, muu = Win32-virhe. #>
+    param([string]$Name = 'DefaultPassword')
+    Initialize-LsaApi
+    return [IRequireLsa]::Clear($Name)
+}

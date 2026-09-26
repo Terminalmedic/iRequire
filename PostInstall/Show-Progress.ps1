@@ -10,7 +10,10 @@
 $base = Join-Path $env:SystemDrive 'iRequire'
 $stateFile = Join-Path $base 'Logs\tila.json'
 $logFile = Join-Path $base 'Logs\postinstall.log'
-$marker = Join-Path $base 'Logs\naytto-valmis.txt'
+# Kayttajan istunto kirjoittaa vain Kayttaja-kansioon: muu C:\iRequire on
+# kayttajille vain luku, koska SYSTEM ajaa sielta skripteja.
+$userDir = Join-Path $base 'Kayttaja'
+$marker = Join-Path $userDir 'naytto-valmis.txt'
 $Host.UI.RawUI.WindowTitle = 'iRequire - viimeistellaan asennusta'
 
 # Jo tehty: ei ikkunaa, ei muutoksia. Kayttaja saa valita taajuutensa itse.
@@ -24,10 +27,10 @@ function Invoke-DisplayTuning {
     try {
         $rows = Set-MaxRefreshRate
         $lines = @($rows | ForEach-Object { '{0}: {1}, {2} Hz -> {3} Hz ({4})' -f $_.Naytto, $_.Tarkkuus, $_.EnnenHz, $_.JalkeenHz, $_.Tulos })
-        $lines | ForEach-Object { Add-Content -LiteralPath (Join-Path $base 'Logs\naytto.log') -Value ((Get-Date -Format s) + ' ' + $_) -ErrorAction SilentlyContinue }
+        $lines | ForEach-Object { Add-Content -LiteralPath (Join-Path $userDir 'naytto.log') -Value ((Get-Date -Format s) + ' ' + $_) -ErrorAction SilentlyContinue }
         return $lines
     } catch {
-        Add-Content -LiteralPath (Join-Path $base 'Logs\naytto.log') -Value ((Get-Date -Format s) + ' virhe: ' + $_.Exception.Message) -ErrorAction SilentlyContinue
+        Add-Content -LiteralPath (Join-Path $userDir 'naytto.log') -Value ((Get-Date -Format s) + ' virhe: ' + $_.Exception.Message) -ErrorAction SilentlyContinue
         return @()
     }
 }
@@ -51,10 +54,6 @@ while ($true) {
             $lines = Invoke-DisplayTuning
             Write-Host ''
             foreach ($l in $lines) { Write-Host ('  Naytto ' + $l) -ForegroundColor Gray }
-            $summary = Join-Path $base 'Reports\yhteenveto.txt'
-            if ($lines.Count -gt 0 -and (Test-Path -LiteralPath $summary)) {
-                Add-Content -LiteralPath $summary -Value (@('', 'NAYTOT') + @($lines | ForEach-Object { '  ' + $_ })) -ErrorAction SilentlyContinue
-            }
             Set-Content -LiteralPath $marker -Value ((Get-Date -Format s) + [Environment]::NewLine + ($lines -join [Environment]::NewLine)) -ErrorAction SilentlyContinue
             Write-Host ''
             Write-Host '  Valmis. Yhteenveto: C:\iRequire\Reports\yhteenveto.txt' -ForegroundColor Green

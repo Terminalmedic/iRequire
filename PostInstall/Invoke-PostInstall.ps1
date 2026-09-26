@@ -388,7 +388,11 @@ function Invoke-StageFinish {
         foreach ($n in @('DefaultPassword', 'AutoLogonCount')) {
             Remove-ItemProperty -LiteralPath $wl -Name $n -ErrorAction SilentlyContinue
         }
-        Write-IRequireLog 'Automaattinen kirjautuminen poistettu'
+        try {
+            $r = Clear-AutoLogonSecret
+            if ($r -gt 1) { Write-IRequireLog "Kirjautumissalasanan LSA-salaisuutta ei voitu poistaa (virhe $r)" 'Varoitus' }
+        } catch { Write-IRequireLog ('LSA-salaisuus: ' + $_.Exception.Message) 'Varoitus' }
+        Write-IRequireLog 'Automaattinen kirjautuminen ja sen salasana poistettu'
     }
 
     # Uudet verkkoliitannat (esim. WLAN-ajuri paivityksista) saavat NetBIOSin
@@ -427,9 +431,17 @@ $state = Get-State
 if ($state.Valmis) {
     # Ajastetut tehtavat jatetaan paikalleen kunnes kayttajan istunto on
     # asettanut naytot (merkki), tai viikko on kulunut. Sitten siivotaan.
-    $marker = Join-Path $base 'Logs\naytto-valmis.txt'
+    $marker = Join-Path $base 'Kayttaja\naytto-valmis.txt'
     $age = ((Get-Date) - (Get-Item -LiteralPath $stateFile).LastWriteTime).TotalDays
     if ((Test-Path -LiteralPath $marker) -or $age -gt 7) {
+        # Kayttajan istunto ei saa kirjoittaa yhteenvetoon (Reports on vain
+        # SYSTEMin ja jarjestelmanvalvojien), joten naytot lisataan taalta.
+        $summary = Join-Path $base 'Reports\yhteenveto.txt'
+        if ((Test-Path -LiteralPath $marker) -and (Test-Path -LiteralPath $summary) -and
+            -not (Select-String -LiteralPath $summary -Pattern '^NAYTOT$' -Quiet)) {
+            $lines = @(Get-Content -LiteralPath $marker -TotalCount 20 | Select-Object -Skip 1 | ForEach-Object { '  ' + ($_ -replace '[^\x20-\x7E]', '') })
+            if ($lines.Count -gt 0) { Add-Content -LiteralPath $summary -Value (@('', 'NAYTOT') + $lines) }
+        }
         Unregister-ScheduledTask -TaskName 'iRequire-edistys' -Confirm:$false -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName 'iRequire' -Confirm:$false -ErrorAction SilentlyContinue
         Write-IRequireLog 'Ajastetut tehtavat poistettu, iRequire on valmis' 'Ok'

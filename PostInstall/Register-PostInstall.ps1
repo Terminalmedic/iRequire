@@ -11,6 +11,16 @@
 $ErrorActionPreference = 'Stop'
 $base = Join-Path $env:SystemDrive 'iRequire'
 
+# SYSTEM ajaa C:\iRequire-kansion skripteja. Suoraan C:n juureen luotu
+# kansio perii oletuksena "Authenticated Users: Modify" -oikeuden, jolloin
+# tavallinen (UAC:n rajoittama) prosessi voisi muokata skripteja ja saada
+# SYSTEM-oikeudet. Siksi: SYSTEM ja jarjestelmanvalvojat taysin, kayttajat
+# vain lukea. Kayttajan istunto kirjoittaa vain Kayttaja-kansioon (dataa).
+& icacls.exe $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
+& icacls.exe (Join-Path $base '*') /reset /T /C /Q | Out-Null
+$userDir = Join-Path $base 'Kayttaja'
+New-Item -ItemType Directory -Path $userDir -Force | Out-Null
+& icacls.exe $userDir /grant '*S-1-5-32-545:(OI)(CI)M' | Out-Null
 # Asetuksissa on kayttajan ja WLANin salasana selvakielisena. Vain
 # SYSTEM ja jarjestelmanvalvojat saavat lukea niita; tiedosto poistetaan
 # kokonaan kun jalkiasennus valmistuu.

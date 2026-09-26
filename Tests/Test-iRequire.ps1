@@ -398,6 +398,14 @@ Test-Case 'Asennuksen lopputarkistus huomaa puuttuvan tiedoston' {
 if ($env:OS -eq 'Windows_NT') {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
+    Test-Case 'Windows: LSA-salaisuuden poisto (kaantyy ja toimii, olematon nimi)' {
+        # Vain olematon, satunnainen nimi: koneen omiin salaisuuksiin ei kosketa.
+        $name = 'iRequireTesti_' + [guid]::NewGuid().ToString('N')
+        $r = Clear-AutoLogonSecret -Name $name
+        if ($isAdmin) { Assert-True ($r -eq 1) "olematon salaisuus: $r (odotettiin 1)" }
+        else { Assert-True ($r -eq 1 -or $r -eq 5) "ilman jarjestelmanvalvojaa: $r" }
+    }
+
     Test-Case 'Windows: levyjen luokittelu oikealla raudalla' {
         $inv = Get-DiskInventory
         $all = @($inv.Internal) + @($inv.Skipped)
@@ -746,6 +754,25 @@ Test-Case 'Esitarkistus: vain valmistajan levyohjainajurit viedaan tikulle' {
     Assert-True (-not (Test-ThirdPartyStorageDriver -InfPath 'stornvme.inf' -Class 'SCSIAdapter')) 'Windowsin NVMe-ajuri'
     Assert-True (-not (Test-ThirdPartyStorageDriver -InfPath 'oem7.inf' -Class 'Display')) 'naytonohjain'
     Assert-True (-not (Test-ThirdPartyStorageDriver -InfPath '' -Class 'HDC')) 'tuntematon inf'
+}
+
+Test-Case 'Turvallisuus: kayttaja ei voi muokata SYSTEMin ajamia skripteja' {
+    # Suoraan C:n juureen luotu kansio perii "Authenticated Users: Modify".
+    # Rekisteroinnin pitaa lukita C:\iRequire ennen ajastettujen tehtavien luontia.
+    $reg = Get-Content -LiteralPath (Join-Path $root 'PostInstall\Register-PostInstall.ps1') -Raw
+    $lock = $reg.IndexOf('& icacls.exe $base /inheritance:r')
+    $task = $reg.IndexOf('Register-ScheduledTask')
+    Assert-True ($lock -gt 0 -and $lock -lt $task) 'C:\iRequire-kansiota ei lukita ennen tehtavien rekisterointia'
+    Assert-True ($reg -match "icacls\.exe \`$base /inheritance:r /grant:r '\*S-1-5-18:\(OI\)\(CI\)F' '\*S-1-5-32-544:\(OI\)\(CI\)F' '\*S-1-5-32-545:\(OI\)\(CI\)RX'") 'kayttajille muu kuin lukuoikeus'
+    # Kayttajan istunnossa ajettava skripti kirjoittaa vain Kayttaja-kansioon.
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'PostInstall\Show-Progress.ps1'), [ref]$null, [ref]$null)
+    $writes = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and
+        @('Add-Content', 'Set-Content', 'Out-File', 'New-Item', 'Copy-Item', 'Move-Item', 'Remove-Item') -contains $n.GetCommandName() }, $true)
+    Assert-True (@($writes).Count -gt 0) 'kirjoituksia ei loytynyt (testi rikki?)'
+    foreach ($w in $writes) {
+        Assert-True ($w.Extent.Text -match '\$userDir|\$marker') ("Show-Progress kirjoittaa muualle: {0}" -f $w.Extent.Text)
+    }
+    Assert-True ((Get-Content -LiteralPath (Join-Path $root 'PostInstall\Show-Progress.ps1') -Raw) -match "\`$marker = Join-Path \`$userDir") 'merkki ei ole Kayttaja-kansiossa'
 }
 
 Test-Case 'Turvallisuus: harjoitustila pysahtyy ennen yhtakaan kirjoittavaa kutsua' {
