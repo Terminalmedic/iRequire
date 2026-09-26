@@ -1,0 +1,58 @@
+{
+  "_kuvaus": "iRequire-asetukset. Tiedosto kopioidaan tikulle, joten sita voi muokata tikulla ilman uudelleenrakennusta.",
+
+  "Kayttaja": {
+    "_kuvaus": "Paikallinen jarjestelmanvalvojatili. Tyhja salasana = kirjautuu suoraan tyopoydalle.",
+    "Nimi": "user",
+    "Salasana": ""
+  },
+
+  "Kone": {
+    "_Nimi": "* = Windows arpoo nimen. Enintaan 15 merkkia, ei valilyonteja.",
+    "Nimi": "*"
+  },
+
+  "Alue": {
+    "_Kayttoliittyma": "Asennuskuvan kieli. Kaytetaan vain, jos kuvassa on kyseinen kielipaketti.",
+    "Kayttoliittyma": "en-US",
+    "Alue": "fi-FI",
+    "Nappaimisto": "040b:0000040b",
+    "Aikavyohyke": "FLE Standard Time"
+  },
+
+  "Tyhjennys": {
+    "_LaskuriSekuntia": "Aika jonka kuluessa Esc peruu kaiken. Tyhjennys alkaa vasta taman jalkeen.",
+    "LaskuriSekuntia": 15,
+    "_Naytteita": "Montako satunnaista kohtaa levylta luetaan ennen ja jalkeen tyhjennyksen varmistusta varten.",
+    "Naytteita": 256,
+    "_KaikkiSisaisetLevyt": "true = tyhjennetaan kaikki sisaiset levyt. false = vain asennuslevy.",
+    "KaikkiSisaisetLevyt": true,
+    "_MinimikokoGt": "Asennuslevyn vahimmaiskoko.",
+    "MinimikokoGt": 40
+  },
+
+  "Asennus": {
+    "_Tuoteavain": "Tyhja = ei avainta. Esim. Microsoftin julkinen KMS-asiakasavain (GVLK) IoT Enterprise LTSC 2024:lle on KBN8V-HFGQ4-MGXVD-347P6-PDQGT. Se ei aktivoi mitaan, vain valitsee version. Ala kayta Evaluation-kuvan kanssa.",
+    "Tuoteavain": "",
+    "_AutomaattikirjautuminenPysyva": "false = automaattinen kirjautuminen poistetaan kun jalkiasennus valmistuu.",
+    "AutomaattikirjautuminenPysyva": false
+  },
+
+  "Wlan": {
+    "_kuvaus": "Valinnainen. Jos kone on pelkan WLANin varassa, paivitykset tarvitsevat taman. Salasana on tikulla selvakielisena.",
+    "Ssid": "",
+    "Salasana": ""
+  },
+
+  "Paivitykset": {
+    "MaksimiKierrokset": 6,
+    "Ajurit": true,
+    "_VerkonOdotusMinuuttia": "Kauanko verkkoa odotetaan ennen kuin paivitykset ohitetaan.",
+    "VerkonOdotusMinuuttia": 10
+  },
+
+  "Sovellukset": {
+    "_Firefox": "true = asennetaan Firefox suoraan Mozillalta. Edge jaa joka tapauksessa (tietosuojakaytannoin).",
+    "Firefox": false
+  }
+}
