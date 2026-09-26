@@ -166,6 +166,19 @@ check 'Keskeneraisen asennuksen merkki poistettu' "grep -q 'PostInstall' out/ls_
 check 'Selvakielinen unattend.xml poistettu' "! grep -q '__LUKUVIRHE__' out/ls_Windows_Panther.txt && ! grep -qix 'unattend.xml' out/ls_Windows_Panther.txt"
 check 'Asetustiedosto (salasanat) poistettu' "! grep -q '__LUKUVIRHE__' out/ls_iRequire_Config.txt && ! grep -q 'iRequire.json' out/ls_iRequire_Config.txt"
 
+# Rekisteri luetaan suoraan levylta: tulivatko kaytannot ja viritykset voimaan?
+reg() { virt-win-reg nvme.qcow2 "$1" 2>/dev/null | tr -d '\r'; }
+reg 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' > out/reg-telemetria.txt
+reg 'HKLM\SYSTEM\CurrentControlSet\Control\CI\Config' > out/reg-ci.txt
+reg 'HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules' > out/reg-asr.txt
+reg 'HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' > out/reg-gpu.txt
+reg 'HKLM\SYSTEM\CurrentControlSet\Control\BitLocker' > out/reg-bitlocker.txt
+check 'Telemetria tasolla 0 (kaytanto voimassa)' "grep -qi '\"AllowTelemetry\"=dword:00000000' out/reg-telemetria.txt"
+check 'Haavoittuvien ajurien estolista paalla' "grep -qi '\"VulnerableDriverBlocklistEnable\"=dword:00000001' out/reg-ci.txt"
+check 'ASR-saannot estotilassa (3 kpl)' "[ \$(grep -ci '=\"1\"' out/reg-asr.txt) -ge 3 ]"
+check 'Laitteistokiihdytetty GPU-ajoitus' "grep -qi '\"HwSchMode\"=dword:00000002' out/reg-gpu.txt"
+check 'Automaattinen laitesalaus estetty' "grep -qi '\"PreventDeviceEncryption\"=dword:00000001' out/reg-bitlocker.txt"
+
 for d in sata nvme; do
     read -r got size hits < <(scan_disk "$d.qcow2" || echo "0 1 -1")
     log "levy $d: luettu $got / $size tavua, salaisuuden osumia $hits"
