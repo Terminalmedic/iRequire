@@ -7,6 +7,19 @@
 # ==============================================================
 
 $script:LogFile = $null
+$script:SerialPort = $null
+
+function Enable-SerialLog {
+    <# Lokirivit myos sarjaporttiin COM1 (Asennus.LokiSarjaporttiin).
+       Automaattinen testi lukee ne virtuaalikoneen ulkopuolelta reaaliajassa. #>
+    try {
+        $p = New-Object System.IO.Ports.SerialPort 'COM1', 115200
+        $p.Open()
+        $script:SerialPort = $p
+    } catch {
+        $script:SerialPort = $null
+    }
+}
 
 function Start-Log {
     param([Parameter(Mandatory)][string]$Path)
@@ -28,6 +41,9 @@ function Write-IRequireLog {
     Write-Host $line -ForegroundColor $color
     if ($script:LogFile) {
         try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 } catch { }
+    }
+    if ($script:SerialPort) {
+        try { $script:SerialPort.WriteLine($line) } catch { }
     }
 }
 
@@ -58,7 +74,7 @@ function Get-IRequireConfig {
         Alue        = @{ Kayttoliittyma = 'en-US'; Alue = 'fi-FI'; Nappaimisto = '040b:0000040b'; Aikavyohyke = 'FLE Standard Time' }
         Tyhjennys   = @{ LaskuriSekuntia = 15; Naytteita = 256; KaikkiSisaisetLevyt = $true; MinimikokoGt = 40
                          TaysiVarmistus = $false; Harjoitus = $false; TarkistaMedia = $true; OdotaVerkkovirtaa = $true }
-        Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false; LopuksiSammutus = $false }
+        Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false; LopuksiSammutus = $false; LokiSarjaporttiin = $false }
         Wlan        = @{ Ssid = ''; Salasana = '' }
         Paivitykset = @{ MaksimiKierrokset = 6; Ajurit = $true; VerkonOdotusMinuuttia = 10 }
         Sovellukset = @{ Firefox = $false; VCRedist = $true; DirectX = $true }

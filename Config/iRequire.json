@@ -45,7 +45,9 @@
     "_AutomaattikirjautuminenPysyva": "false = automaattinen kirjautuminen poistetaan kun jalkiasennus valmistuu.",
     "AutomaattikirjautuminenPysyva": false,
     "_LopuksiSammutus": "true = kone sammuu (eika kaynnisty uudelleen) kun jalkiasennus on valmis. Kaytetaan automaattisessa paasta paahan -testissa; kotikaytossa false.",
-    "LopuksiSammutus": false
+    "LopuksiSammutus": false,
+    "_LokiSarjaporttiin": "true = lokirivit myos sarjaporttiin COM1. Automaattista testia varten.",
+    "LokiSarjaporttiin": false
   },
 
   "Wlan": {

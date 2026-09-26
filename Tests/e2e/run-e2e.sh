@@ -82,6 +82,14 @@ while kill -0 "$QEMU_PID" 2>/dev/null; do
     shot=$((shot + 1))
     # Joka minuutti resurssit ajon lokiin: jos ajuri kuolee, syy nakyy.
     if [ $((shot % 2)) -eq 0 ]; then resources; log "levyt: nvme $(du -h nvme.qcow2 | cut -f1), sata $(du -h sata.qcow2 | cut -f1)"; fi
+    # iRequiren oma loki sarjaportista reaaliajassa ajon lokiin.
+    if [ -f out/serial.log ]; then
+        now_lines=$(wc -l < out/serial.log)
+        if [ "$now_lines" -gt "${seen_lines:-0}" ]; then
+            tail -n +$(( ${seen_lines:-0} + 1 )) out/serial.log | head -n $(( now_lines - ${seen_lines:-0} )) | tr -d '\r' | sed 's/^/    VM> /'
+            seen_lines=$now_lines
+        fi
+    fi
     # Kuvakaappaus puolen minuutin valein: jos jokin jumittuu, nakyy mihin.
     echo "screendump $WORK/shots/s$(printf %04d $shot).ppm" | socat - "unix-connect:mon.sock" >/dev/null 2>&1 || true
     if [ "$(date +%s)" -gt "$deadline" ]; then

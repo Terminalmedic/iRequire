@@ -28,6 +28,7 @@ if (-not $mutex.WaitOne(0)) { exit 0 }
 
 Start-Log -Path (Join-Path $base 'Logs\postinstall.log')
 $config = Get-IRequireConfig -Path (Join-Path $base 'Config\iRequire.json')
+if ($config.Asennus.LokiSarjaporttiin) { Enable-SerialLog }
 $debloat = Get-Content -LiteralPath (Join-Path $base 'Policies\Debloat.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 
 function Get-State {

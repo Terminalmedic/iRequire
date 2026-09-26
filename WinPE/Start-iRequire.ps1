@@ -31,6 +31,7 @@ $reportDir = Get-WritableDirectory -Candidates @((Join-Path $base "Reports\$runI
 Start-Log -Path (Join-Path $reportDir 'winpe.log')
 if ($reportDir -notlike "$UsbRoot*") { Write-IRequireLog 'Tikulle ei voi kirjoittaa (kirjoitussuojattu tai ISO): raportit tallennetaan vain asennettavalle koneelle' 'Varoitus' }
 $config = Get-IRequireConfig -Path (Join-Path $base 'Config\iRequire.json')
+if ($config.Asennus.LokiSarjaporttiin) { Enable-SerialLog; Write-IRequireLog 'WinPE: sarjaporttiloki kaytossa' }
 $dryRun = [bool]$config.Tyhjennys.Harjoitus
 
 try { & powercfg.exe /s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c 2>&1 | Out-Null } catch { }

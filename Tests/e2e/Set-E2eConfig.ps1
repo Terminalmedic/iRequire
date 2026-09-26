@@ -22,5 +22,6 @@ $c.Tyhjennys.OdotaVerkkovirtaa = $false
 $c.Paivitykset.MaksimiKierrokset = $UpdateRounds
 $c.Paivitykset.VerkonOdotusMinuuttia = 3
 $c.Asennus.LopuksiSammutus = $true
+$c.Asennus.LokiSarjaporttiin = $true
 $c | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $path -Encoding UTF8
 Write-Host "Testiasetukset: $path"
