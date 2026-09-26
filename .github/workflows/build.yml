@@ -16,6 +16,19 @@ on:
         description: 'ISOn SHA-256 (tarkistetaan ennen kayttoa)'
         required: false
         default: '2cee70bd183df42b92a2e0da08cc2bb7a2a9ce3a3841955a012c0f77aeb3cb29'
+      update_rounds:
+        description: 'Windows Update -kierroksia paasta paahan -testissa (0 = nopea ajo ilman paivityksia)'
+        required: false
+        default: '0'
+
+# Uusi push samaan haaraan peruu vanhan, kesken olevan ajon (Actions-minuutit).
+concurrency:
+  group: rakennus-${{ github.ref }}
+  cancel-in-progress: true
+  schedule:
+    # Viikoittain: sama ketju Windows Updaten kanssa. Nain huomataan jos
+    # Microsoftin uusi paivitys rikkoo jotain, vaikka koodi ei muuttuisi.
+    - cron: '17 2 * * 0'
   push:
     paths:
       - 'Build/**'
@@ -30,6 +43,8 @@ on:
 env:
   ISO_URL: ${{ github.event.inputs.iso_url || 'https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.1742.240906-0331.ge_release_svc_refresh_CLIENT_IOT_LTSC_EVAL_x64FRE_en-us.iso' }}
   ISO_SHA256: ${{ github.event.inputs.iso_sha256 || '2cee70bd183df42b92a2e0da08cc2bb7a2a9ce3a3841955a012c0f77aeb3cb29' }}
+  # Ajastettu ajo: yksi paivityskierros. Push: ei paivityksia (nopea).
+  UPDATE_ROUNDS: ${{ github.event.inputs.update_rounds || (github.event_name == 'schedule' && '1') || '0' }}
 
 jobs:
   build:
@@ -86,7 +101,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          .\Tests\e2e\Set-E2eConfig.ps1 -MediaDir D:\irq\out\Media
+          .\Tests\e2e\Set-E2eConfig.ps1 -MediaDir D:\irq\out\Media -UpdateRounds ([int]$env:UPDATE_ROUNDS)
           # Eheys pysyy: asetukset eivat kuulu manifestiin.
           . .\Lib\Common.ps1; . .\Lib\Media.ps1
           $p = Test-MediaManifest -MediaRoot D:\irq\out\Media
@@ -113,7 +128,7 @@ jobs:
     name: Paasta paahan (QEMU/KVM, koko ketju ilman ihmista)
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 200
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
 
@@ -147,6 +162,8 @@ jobs:
           sudo mkdir -p "$base/e2e" && sudo chown "$USER" "$base/e2e"
           ln -sfn "$base/e2e" /tmp/e2e
           echo "Tyokansio: $base/e2e"
+          # Paivitykset (kumulatiivinen paivitys ladataan ja asennetaan) vievat tunteja.
+          if [ "$UPDATE_ROUNDS" != "0" ]; then export E2E_TIMEOUT_MIN=300 E2E_EXPECT_UPDATES=1; fi
           bash Tests/e2e/run-e2e.sh "$GITHUB_WORKSPACE/iso/iRequire.iso" "$base/e2e"
 
       - name: Talleta lokit ja kuvakaappaukset

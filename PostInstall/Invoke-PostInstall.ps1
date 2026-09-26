@@ -268,9 +268,15 @@ function Invoke-UpdateRound {
     }
     if ($coll.Count -eq 0) { return [pscustomobject]@{ Count = 0; Reboot = $false } }
 
+    # Suuri kumulatiivinen paivitys voi ladata ja asentua pitkaan ilman
+    # nakyvaa edistysta, joten kerrotaan mita tehdaan ja kuinka paljon.
+    $bytes = 0
+    for ($i = 0; $i -lt $coll.Count; $i++) { $bytes += [double]$coll.Item($i).MaxDownloadSize }
+    Write-IRequireLog ("Ladataan {0} paivitysta, enintaan {1:N0} Mt" -f $coll.Count, ($bytes / 1MB))
     $dl = $session.CreateUpdateDownloader()
     $dl.Updates = $coll
-    [void]$dl.Download()
+    $dr = $dl.Download()
+    Write-IRequireLog ("Lataus valmis (tulos {0}), asennetaan" -f $dr.ResultCode)
 
     $inst = $session.CreateUpdateInstaller()
     $inst.Updates = $coll

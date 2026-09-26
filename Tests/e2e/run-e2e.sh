@@ -177,6 +177,9 @@ print(total, sys.argv[2], hits)' "$SECRET" "$size"
 }
 
 check 'Windows asennettiin NVMe-levylle' "grep -qx 'SYSTEM' out/ls_Windows_System32_config.txt"
+if [ "${E2E_EXPECT_UPDATES:-0}" = "1" ]; then
+    check 'Windows Update: paivityksia asennettiin' "python3 -c \"import json,sys; d=json.load(open('out/Logs/tila.json',encoding='utf-8-sig')); sys.exit(0 if int(d.get('Paivityksia',0))>0 else 1)\""
+fi
 check 'Jalkiasennus valmis (tila.json)' "python3 -c \"import json,sys; d=json.load(open('out/Logs/tila.json',encoding='utf-8-sig')); sys.exit(0 if d.get('Valmis') else 1)\""
 check 'Tyhjennystodistus: molemmat levyt HYVAKSYTTY' "[ \$(cat out/Reports/tyhjennystodistus-*.txt 2>/dev/null | grep -c 'Varmistus:    HYVAKSYTTY') -eq 2 ]"
 check 'Yhteenveto kirjoitettu' "test -s out/Reports/yhteenveto.txt"
