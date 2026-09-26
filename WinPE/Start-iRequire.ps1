@@ -160,14 +160,21 @@ try {
     Write-Host ("  Kaynnistystila: {0}" -f $firmware) -ForegroundColor DarkGray
     Write-Host ''
 
+    $totalMax = 0
     foreach ($d in $toWipe) {
         $role = if ($d.Number -eq $target.Number) { '  <- Windows asennetaan tahan' } else { '' }
         Write-Host ('  LEVY {0}: {1}' -f $d.Number, $d.Model) -ForegroundColor White -NoNewline
         Write-Host $role -ForegroundColor Cyan
         Write-Host ('    {0}, {1} / {2}, sarjanumero {3}' -f (Format-Size $d.Size), $d.Bus, $d.Kind, $d.Serial) -ForegroundColor Gray
+        $est = Get-WipeEstimate -SizeBytes $d.Size -Kind $d.Kind -FullVerify:([bool]$config.Tyhjennys.TaysiVarmistus)
+        $totalMax += $est.Max
+        Write-Host ('    Tyhjennyksen arvioitu kesto: {0}' -f (Format-WipeEstimate $est)) -ForegroundColor Gray
         foreach ($ln in (Get-DiskContentSummary -Number $d.Number)) { Write-Host ('    ' + $ln) -ForegroundColor DarkGray }
         Write-Host ''
         Write-IRequireLog ('Tyhjennettava levy {0}: {1} {2} {3} {4}' -f $d.Number, $d.Model, $d.Serial, $d.Kind, (Format-Size $d.Size))
+    }
+    if ($totalMax -gt 3600) {
+        Write-Host ('  Tyhjennys voi kestaa yhteensa jopa {0}. Kone jatkaa itsestaan, sita ei tarvitse valvoa.' -f (Format-Duration $totalMax)) -ForegroundColor Yellow
     }
     foreach ($d in $inventory.Skipped) {
         Write-Host ('  Ei kosketa: levy {0} {1} ({2}, {3})' -f $d.Number, $d.Model, (Format-Size $d.Size), $d.Reason) -ForegroundColor DarkGreen

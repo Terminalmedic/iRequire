@@ -139,6 +139,33 @@ function Test-FlashKind {
     return ($Kind -in @('NVMe', 'SSD', 'eMMC'))
 }
 
+function Get-WipeEstimate {
+    <# Arvio tyhjennyksen kestosta sekunteina (Min..Max). Varovaiset kestavat
+       kirjoitusnopeudet (SLC-valimuistin jalkeen). Flash: laitteen oma
+       tyhjennys kestaa sekunteja-minuutteja, mutta jos laite ei tue sita,
+       levy nollataan: ylaraja kattaa sen. Taysi varmistus lukee koko levyn. #>
+    param([Parameter(Mandatory)][double]$SizeBytes, [string]$Kind, [switch]$FullVerify)
+    $mbps = switch ($Kind) { 'NVMe' { 800 } 'SSD' { 350 } 'eMMC' { 60 } 'HDD' { 110 } default { 110 } }
+    $zero = $SizeBytes / ($mbps * 1MB)
+    if ($FullVerify) { $zero *= 2 }
+    $min = if (Test-FlashKind $Kind) { 60 } else { $zero }
+    return [pscustomobject]@{ Min = [math]::Round($min); Max = [math]::Round($zero) }
+}
+
+function Format-Duration {
+    param([double]$Seconds)
+    if ($Seconds -lt 90) { return 'alle 2 min' }
+    if ($Seconds -lt 3600) { return ('{0} min' -f [math]::Ceiling($Seconds / 60)) }
+    return ('{0:0.0} h' -f ($Seconds / 3600)).Replace(',', '.')
+}
+
+function Format-WipeEstimate {
+    param([Parameter(Mandatory)]$Estimate)
+    $hi = Format-Duration $Estimate.Max
+    if ($Estimate.Max -le 90 -or $Estimate.Min -ge $Estimate.Max) { return "noin $hi" }
+    return ('{0} - {1}' -f (Format-Duration $Estimate.Min), $hi)
+}
+
 function Get-DiskInventory {
     <# Kaikki levyt luokiteltuina. Palauttaa seka tyhjennettavat etta
        rauhaan jatettavat, jotta laskuri voi nayttaa molemmat. #>

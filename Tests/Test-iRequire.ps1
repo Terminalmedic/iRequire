@@ -814,6 +814,19 @@ Test-Case 'Turvallisuus: kayttaja ei voi muokata SYSTEMin ajamia skripteja' {
     Assert-True ((Get-Content -LiteralPath (Join-Path $root 'PostInstall\Show-Progress.ps1') -Raw) -match "\`$marker = Join-Path \`$userDir") 'merkki ei ole Kayttaja-kansiossa'
 }
 
+Test-Case 'Tyhjennyksen kestoarvio laskurin ruudulle' {
+    $tb = 1000000000000
+    $hdd = Get-WipeEstimate -SizeBytes (2 * $tb) -Kind 'HDD'
+    Assert-True ($hdd.Min -eq $hdd.Max -and $hdd.Max -gt 4 * 3600 -and $hdd.Max -lt 6 * 3600) "2 Tt HDD: $($hdd.Max) s"
+    Assert-True ((Format-WipeEstimate $hdd) -match '^noin \d\.\d h$') ("HDD: " + (Format-WipeEstimate $hdd))
+    $full = Get-WipeEstimate -SizeBytes (2 * $tb) -Kind 'HDD' -FullVerify
+    Assert-True ([math]::Abs($full.Max - 2 * $hdd.Max) -le 1) 'taysi varmistus ei kaksinkertaista'
+    $nvme = Get-WipeEstimate -SizeBytes $tb -Kind 'NVMe'
+    Assert-True ($nvme.Min -le 120 -and $nvme.Max -gt 600) "NVMe: $($nvme.Min)-$($nvme.Max)"
+    Assert-True ((Format-WipeEstimate $nvme) -match '^alle 2 min - \d+ min$') ("NVMe: " + (Format-WipeEstimate $nvme))
+    Assert-True ((Format-Duration 30) -eq 'alle 2 min' -and (Format-Duration 600) -eq '10 min' -and (Format-Duration 5400) -eq '1.5 h') 'Format-Duration'
+}
+
 Test-Case 'Turvallisuus: harjoitustila pysahtyy ennen yhtakaan kirjoittavaa kutsua' {
     # Rakennetesti: tuleva muutos ei saa siirtaa levylle kirjoittavaa kutsua
     # harjoitustilan pysahdyksen eteen, eika laskuria/tarkistuksia sen jalkeen.
