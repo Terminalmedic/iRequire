@@ -122,7 +122,7 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
         'Set-VMKeyProtector','Set-VMMemory','Set-VMProcessor','Split-WindowsImage','Start-ScheduledTask',
         'Start-VM','Stop-Service','Unregister-ScheduledTask','Update-MpSignature','Update-Disk',
         'Enable-WindowsOptionalFeature','Get-Tpm','Get-BitLockerVolume','Add-BitLockerKeyProtector',
-        'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-NetFirewallProfile',
+        'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-MpPreference','Get-NetFirewallProfile',
         'Confirm-SecureBootUEFI','Set-CimInstance','Get-WindowsPackage')
     $defined = @{}
     $calls = @{}
@@ -682,6 +682,14 @@ Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScree
     foreach ($svc in @('WinDefend', 'mpssvc', 'SecurityHealthService', 'wscsvc', 'Sense', 'WdNisSvc')) {
         Assert-True ($d.Palvelut -notcontains $svc) "Tietoturvapalvelu $svc poistolistalla"
     }
+}
+
+Test-Case 'Tietoturva: ASR-saantojen estotilan laskenta' {
+    Assert-True ((Get-AsrBlockCount -Ids @('a', 'b', 'c') -Actions @(1, 1, 1)) -eq 3) 'kolme estotilassa'
+    Assert-True ((Get-AsrBlockCount -Ids @('a', 'b', 'c') -Actions @(1, 2, 6)) -eq 1) 'valvonta (2) ja varoitus (6) eivat ole estoa'
+    Assert-True ((Get-AsrBlockCount -Ids @('a', 'b') -Actions @(1)) -eq 1) 'puuttuva toiminto'
+    Assert-True ((Get-AsrBlockCount -Ids $null -Actions $null) -eq 0) 'ei saantoja (null)'
+    Assert-True ((Get-AsrBlockCount -Ids 'a' -Actions 1) -eq 1) 'yksi saanto skalaarina'
 }
 
 Test-Case 'Naytto: suurin taajuus samalla tarkkuudella, ei lomitettuja' {

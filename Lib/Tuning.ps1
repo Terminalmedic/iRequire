@@ -217,6 +217,17 @@ function Invoke-StageTuning {
     }
 }
 
+function Get-AsrBlockCount {
+    <# Montako ASR-saantoa on estotilassa (toiminto 1). Get-MpPreference
+       palauttaa tunnisteet ja toiminnot rinnakkaisina taulukkoina. #>
+    param([object[]]$Ids = @(), [object[]]$Actions = @())
+    $n = 0
+    for ($i = 0; $i -lt @($Ids).Count; $i++) {
+        if ($i -lt @($Actions).Count -and "$(@($Actions)[$i])" -eq '1') { $n++ }
+    }
+    return $n
+}
+
 function Get-SecuritySummary {
     <# Yhteenvetoon: mika suojaus on paalla. Paras yritys, virhe ei haittaa. #>
     $lines = New-Object System.Collections.Generic.List[string]
@@ -224,6 +235,11 @@ function Get-SecuritySummary {
         $mp = Get-MpComputerStatus -ErrorAction Stop
         $lines.Add(('Defender: reaaliaikainen suojaus {0}, maaritykset {1}, tila {2}' -f $(if ($mp.RealTimeProtectionEnabled) { 'paalla' } else { 'POIS' }), $mp.AntivirusSignatureVersion, $mp.AMRunningMode))
     } catch { $lines.Add('Defender: tilaa ei saatu') }
+    try {
+        # Defenderin oma nakemys (kaytanto + paikalliset asetukset yhdessa).
+        $pref = Get-MpPreference -ErrorAction Stop
+        $lines.Add(('ASR-saannot: {0} estotilassa' -f (Get-AsrBlockCount -Ids $pref.AttackSurfaceReductionRules_Ids -Actions $pref.AttackSurfaceReductionRules_Actions)))
+    } catch { $lines.Add('ASR-saannot: tilaa ei saatu') }
     try {
         $fw = @(Get-NetFirewallProfile -ErrorAction Stop | Where-Object { -not $_.Enabled })
         $lines.Add($(if ($fw.Count -eq 0) { 'Palomuuri: paalla kaikissa profiileissa' } else { 'Palomuuri: POIS profiileissa ' + (($fw | ForEach-Object { $_.Name }) -join ', ') }))

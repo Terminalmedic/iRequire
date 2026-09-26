@@ -177,7 +177,7 @@ check 'Asetustiedosto (salasanat) poistettu' "! grep -q '__LUKUVIRHE__' out/ls_i
 # Rekisteri luetaan suoraan levylta: tulivatko kaytannot ja viritykset voimaan?
 # Puuttuva avain ei saa kaataa skriptia (set -e + pipefail): tarkistus kertoo.
 # --unsafe-printable-strings: muuten REG_SZ tulostuu muodossa hex(1):...
-reg() { virt-win-reg --unsafe-printable-strings nvme.qcow2 "$1" 2>/dev/null | tr -d '\r' || true; }
+reg() { virt-win-reg --unsafe-printable-strings nvme.qcow2 "$1" 2>>out/reg-virheet.txt | tr -d '\r' || true; }
 # Levylla ei ole CurrentControlSet-avainta (Windows luo sen kaynnistyessa):
 # oikea ControlSet00N luetaan avaimesta Select.
 cs=$(reg 'HKLM\SYSTEM\Select' | sed -n 's/^"Current"=dword:0*\([0-9a-f]*\)$/\1/Ip' | head -1)
@@ -190,7 +190,10 @@ reg "$ccs\\Control\\GraphicsDrivers" > out/reg-gpu.txt
 reg "$ccs\\Control\\BitLocker" > out/reg-bitlocker.txt
 check 'Telemetria tasolla 0 (kaytanto voimassa)' "grep -qi '\"AllowTelemetry\"=dword:00000000' out/reg-telemetria.txt"
 check 'Haavoittuvien ajurien estolista paalla' "grep -qi '\"VulnerableDriverBlocklistEnable\"=dword:00000001' out/reg-ci.txt"
-check 'ASR-saannot estotilassa (3 kpl)' "[ \$(grep -ci '=\"1\"' out/reg-asr.txt) -ge 3 ]"
+# ASR: Defenderin oma nakemys yhteenvedosta (Get-MpPreference). Levylta luettu
+# kaytantoavain vain diagnostiikkaan.
+reg 'HKLM\SOFTWARE\Policies\Microsoft\Windows Defender' > out/reg-defender.txt
+check 'ASR-saannot estotilassa (3 kpl, Defenderin mukaan)' "grep -a -q 'ASR-saannot: [3-9] estotilassa' out/Reports/yhteenveto.txt"
 check 'Laitteistokiihdytetty GPU-ajoitus' "grep -qi '\"HwSchMode\"=dword:00000002' out/reg-gpu.txt"
 check 'Automaattinen laitesalaus estetty' "grep -qi '\"PreventDeviceEncryption\"=dword:00000001' out/reg-bitlocker.txt"
 
