@@ -277,6 +277,12 @@ Test-Case 'Turvallisuus: virheellinen asetustiedosto pysayttaa ennen tyhjennysta
         Assert-True ($p.Count -eq 1 -and $p[0] -match "osio 'Tyhjenys'") ('tuntematon osio: ' + ($p -join '; '))
         $p = @(& $check '{ "Tyhjennys": { "LaskuriSekuntia": "15" } }')
         Assert-True ($p.Count -eq 1 -and $p[0] -match 'kokonaisluku') ('luku tekstina: ' + ($p -join '; '))
+        $p = @(& $check '{ "Kone": { "Nimi": "Pelikone 2026 Ultra" } }')
+        Assert-True ($p.Count -eq 1 -and $p[0] -match 'Kone\.Nimi') ('koneen nimi: ' + ($p -join '; '))
+        $p = @(& $check '{ "Kayttaja": { "Nimi": "matti/pc" } }')
+        Assert-True ($p.Count -eq 1 -and $p[0] -match 'Kayttaja\.Nimi') ('kayttajanimi: ' + ($p -join '; '))
+        $p = @(& $check '{ "Kone": { "Nimi": "PELI-PC" }, "Kayttaja": { "Nimi": "Matti Meikalainen" } }')
+        Assert-True ($p.Count -eq 0) ('kelvolliset nimet hylattiin: ' + ($p -join '; '))
         $p = @(& $check '{ "_kuvaus": "x", "Tyhjennys": { "_Harjoitus": "selite", "Harjoitus": true, "LaskuriSekuntia": 30 }, "Suorituskyky": { "HorrostilaPois": false } }')
         Assert-True ($p.Count -eq 0) ('kelvollinen hylattiin: ' + ($p -join '; '))
         # Start-iRequire pysahtyy ongelmiin ennen yhtakaan levyoperaatiota.

@@ -279,6 +279,20 @@ function Test-IRequireConfig {
             }
         }
     }
+    # Arvot, jotka rikkoisivat Windowsin asennuksen vasta tyhjennyksen jalkeen
+    # ("Windows could not parse or process unattend answer file").
+    if ($problems.Count -eq 0) {
+        $cfg = Get-IRequireConfig -Path $Path
+        $pc = [string]$cfg.Kone.Nimi
+        if ($pc -ne '*' -and ($pc -notmatch '^[A-Za-z0-9-]{1,15}$' -or $pc -match '^\d+$')) {
+            $problems.Add("'Kone.Nimi' ($pc): enintaan 15 merkkia, vain kirjaimet a-z, numerot ja viiva, ei pelkkia numeroita (tai * = Windows arpoo)")
+        }
+        $user = [string]$cfg.Kayttaja.Nimi
+        if ($user -notmatch '^[^"/\\\[\]:;|=,+*?<>@]{1,20}$' -or $user.Trim() -ne $user -or $user -match '\.$') {
+            $problems.Add("'Kayttaja.Nimi' ($user): 1-20 merkkia, ei merkkeja `"/\[]:;|=,+*?<>@, ei alku- tai loppuvalilyontia")
+        }
+        if ([int]$cfg.Tyhjennys.LaskuriSekuntia -lt 5) { $problems.Add("'Tyhjennys.LaskuriSekuntia' vahintaan 5 (Esc-ikkuna)") }
+    }
     return $problems.ToArray()
 }
 
