@@ -142,6 +142,9 @@ function Copy-Payload {
 
     $src = Join-Path $UsbRoot 'iRequire'
     $dst = Join-Path $Target 'iRequire'
+    # Kohde luotava ensin: muuten Copy-Item kopioi ensimmaisen kansion
+    # kohteen NIMELLA (W:\iRequire\Invoke-PostInstall.ps1) eika sen sisaan.
+    New-Item -ItemType Directory -Path $dst -Force | Out-Null
     foreach ($sub in @('PostInstall', 'Policies', 'Lib', 'Config', 'Tools')) {
         $s = Join-Path $src $sub
         if (Test-Path -LiteralPath $s) { Copy-Item -LiteralPath $s -Destination $dst -Recurse -Force }

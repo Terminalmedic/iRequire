@@ -77,6 +77,9 @@ QEMU_PID=$!
 
 shot=0
 deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
+STALL_MIN="${E2E_STALL_MIN:-25}"
+last_size=0
+last_change=$(date +%s)
 while kill -0 "$QEMU_PID" 2>/dev/null; do
     sleep 30
     shot=$((shot + 1))
@@ -97,6 +100,17 @@ while kill -0 "$QEMU_PID" 2>/dev/null; do
     sleep 1; if [ -f "$f.ppm" ]; then pnmtopng "$f.ppm" > "$f.png" 2>/dev/null || true; fi; rm -f "$f.ppm"
     old="$WORK/shots/s$(printf %04d $((shot - 8))).png"
     [ $(( (shot - 8) % 4 )) -ne 0 ] && rm -f "$old"
+    # Jumin tunnistus: jos kumpikaan levy ei muutu $STALL_MIN minuuttiin,
+    # kone odottaa jotain (virheilmoitus, nappainta) - ei kannata odottaa tunteja.
+    size=$(( $(stat -c %s nvme.qcow2) + $(stat -c %s sata.qcow2) ))
+    if [ "$size" -ne "$last_size" ]; then last_size=$size; last_change=$(date +%s); fi
+    if [ $(( $(date +%s) - last_change )) -gt $(( STALL_MIN * 60 )) ]; then
+        log "JUMISSA: levyt eivat ole muuttuneet $STALL_MIN minuuttiin"
+        echo "quit" | socat - "unix-connect:mon.sock" >/dev/null 2>&1 || kill "$QEMU_PID" || true
+        wait "$QEMU_PID" || true
+        echo "STALL" > out/tulos.txt
+        break
+    fi
     if [ "$(date +%s)" -gt "$deadline" ]; then
         log "AIKARAJA: kone ei sammunut itse $TIMEOUT_MIN minuutissa"
         echo "quit" | socat - "unix-connect:mon.sock" >/dev/null 2>&1 || kill "$QEMU_PID" || true
@@ -160,6 +174,29 @@ for d in sata nvme; do
 done
 
 if [ -f out/Reports/yhteenveto.txt ]; then echo '----- yhteenveto.txt -----'; cat out/Reports/yhteenveto.txt; fi
+
+# --- 5. Diagnostiikka ajon lokiin (artefaktit eivat aina ole saatavilla) ---
+if [ "$fail" -ne 0 ]; then
+    echo '===== DIAGNOSTIIKKA ====='
+    for f in out/Reports/*.log out/Logs/*.log out/Logs/*.json; do
+        [ -f "$f" ] || continue
+        echo "----- $f (viimeiset 60 rivia) -----"; tail -n 60 "$f" | tr -d '\r'
+    done
+    for dir in /iRequire /iRequire/Logs /iRequire/Reports /Windows/Panther /Windows/Setup/Scripts; do
+        echo "----- ls $dir -----"; virt-ls -a nvme.qcow2 "$dir" 2>&1 | head -40
+    done
+    echo '----- EFI-osio -----'
+    virt-ls -a nvme.qcow2 -m /dev/sda1 /EFI/Microsoft/Boot 2>&1 | head -20
+    for f in /Windows/Panther/setupact.log /Windows/Panther/setuperr.log /Windows/Panther/UnattendGC/setupact.log /Windows/Panther/UnattendGC/setuperr.log /iRequire/Logs/setupcomplete.log; do
+        echo "----- $f (viimeiset 40 rivia) -----"
+        virt-cat -a nvme.qcow2 "$f" 2>/dev/null | tr -d '\r' | tail -n 40
+    done
+    echo '----- Nayton teksti (OCR, viimeiset kuvakaappaukset) -----'
+    for png in $(ls shots/*.png 2>/dev/null | tail -n 2); do
+        echo ">> $png"
+        convert "$png" -negate -resize 200% -threshold 50% /tmp/ocr.png 2>/dev/null && tesseract /tmp/ocr.png - 2>/dev/null | grep -v '^\s*$' | head -40
+    done
+fi
 for f in out/Reports/tyhjennystodistus-*.txt; do [ -f "$f" ] && { echo "----- $(basename "$f") -----"; cat "$f"; }; done
 
 if [ "$fail" -ne 0 ]; then log "PAASTA PAAHAN -TESTI EPAONNISTUI"; exit 1; fi

@@ -291,6 +291,32 @@ Test-Case 'Raporttikansio: kirjoitussuojatun ohi seuraavaan' {
     }
 }
 
+Test-Case 'Asennus: Copy-Payload + lopputarkistus oikealla tikun rakenteella' {
+    # Loytyi paasta paahan -testissa: Copy-Item kopioi ensimmaisen kansion
+    # kohteen NIMELLA kun kohdetta ei viela ollut (W:\iRequire\Invoke-...ps1).
+    $t = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-cp-' + [guid]::NewGuid().ToString('N'))
+    $usb = Join-Path $t 'usb'; $w = Join-Path $t 'W'; $sy = Join-Path $t 'S'; $rep = Join-Path $t 'rep'
+    try {
+        foreach ($sub in @('PostInstall', 'Policies', 'Lib', 'Config', 'Tools', 'Unattend')) {
+            Copy-Item -LiteralPath (Join-Path $root $sub) -Destination (Join-Path $usb "iRequire\$sub") -Recurse -Force -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Path (Join-Path $usb "iRequire\$sub") -Force | Out-Null
+        }
+        New-Item -ItemType Directory -Path $rep -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $rep 'tyhjennystodistus-x.txt') -Value 'x'
+        foreach ($f in @("$w\Windows\System32\config\SYSTEM", "$w\Windows\System32\winload.efi", "$sy\EFI\Microsoft\Boot\bootmgfw.efi", "$sy\EFI\Microsoft\Boot\BCD")) {
+            New-Item -ItemType File -Path $f -Force | Out-Null
+        }
+        $cfg = Get-IRequireConfig -Path (Join-Path $root 'Config\iRequire.json')
+        Copy-Payload -UsbRoot $usb -Target $w -Config $cfg -ReportsDir $rep
+        Assert-True (Test-Path -LiteralPath "$w\iRequire\PostInstall\Invoke-PostInstall.ps1") 'PostInstall ei ole omassa kansiossaan'
+        Assert-True (Test-Path -LiteralPath "$w\iRequire\Reports\tyhjennystodistus-x.txt") 'Todistus ei kopioitunut'
+        Assert-True (Test-Path -LiteralPath "$w\iRequire\ASENNUS-KESKEN.tag") 'Merkki puuttuu'
+        Test-Deployment -Windows $w -System $sy -Firmware UEFI
+    } finally {
+        Remove-Item -LiteralPath $t -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Test-Case 'Asennuksen lopputarkistus huomaa puuttuvan tiedoston' {
     $w = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-w-' + [guid]::NewGuid().ToString('N'))
     $sy = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-s-' + [guid]::NewGuid().ToString('N'))
