@@ -694,6 +694,31 @@ Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScree
     }
 }
 
+Test-Case 'Sovellukset: kayttajakohtaiset (Discord, Spotify) ja asennusohjelman odotus' {
+    $none = Get-UserApps -Selection ([pscustomobject]@{ Discord = $false; Spotify = $false })
+    Assert-True ($none.Count -eq 0) 'valitsematta asennettaisiin'
+    $both = Get-UserApps -Selection ([pscustomobject]@{ Discord = $true; Spotify = $true })
+    Assert-True ($both.Count -eq 2) "valittuja $($both.Count)"
+    foreach ($a in $both) {
+        Assert-True ($a.Url -match '^https://') "$($a.Name): ei HTTPS"
+        Assert-True ($a.Publisher.Length -gt 3) "$($a.Name): julkaisija puuttuu"
+        $parts = $a.Check -split '\\', 2
+        Assert-True (@('LOCALAPPDATA', 'APPDATA') -contains $parts[0] -and $parts[1] -like '*.exe') "$($a.Name): tarkistuspolku $($a.Check)"
+    }
+    # Muokattu valintatiedosto (Kayttaja-kansio on kayttajan kirjoitettavissa)
+    # ei voi tuoda omia osoitteita: vain luettelon nimet kelpaavat.
+    $evil = Get-UserApps -Selection ([pscustomobject]@{ Discord = $true; Paha = $true; Url = 'http://x' })
+    Assert-True ($evil.Count -eq 1 -and $evil[0].Name -eq 'Discord') 'tuntematon valinta kelpasi'
+    Assert-True ($null -eq (Get-UserApps -Selection ([pscustomobject]@{ Discord = 'true' }))[0]) 'merkkijono true kelpasi totuusarvona'
+    # Start-Process -Wait odottaisi myos lapsiprosesseja (Discord kaynnistyy asennuksen jalkeen).
+    $fn = (Get-Command Install-SignedInstaller).ScriptBlock.Ast
+    $sp = @($fn.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Start-Process' }, $true))
+    Assert-True ($sp.Count -eq 1) "Start-Process-kutsuja $($sp.Count)"
+    $waitParam = @($sp[0].CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] -and $_.ParameterName -eq 'Wait' })
+    Assert-True ($waitParam.Count -eq 0) 'Install-SignedInstaller kayttaa Start-Process -Waitia'
+    Assert-True ($fn.Extent.Text -match 'WaitForExit\(') 'ei aikarajallista odotusta'
+}
+
 Test-Case 'Rakennus: Windows-version valinta eri ISOista' {
     $pat = @('*IoT Enterprise LTSC*', '*Enterprise LTSC*', '*Pro', '*Enterprise*')
     $img = { param([string[]]$n) $i = 0; $n | ForEach-Object { $i++; [pscustomobject]@{ ImageIndex = $i; ImageName = $_ } } }

@@ -77,7 +77,7 @@ function Get-IRequireConfig {
         Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false; LopuksiSammutus = $false; LokiSarjaporttiin = $false }
         Wlan        = @{ Ssid = ''; Salasana = '' }
         Paivitykset = @{ MaksimiKierrokset = 6; Ajurit = $true; VerkonOdotusMinuuttia = 10 }
-        Sovellukset = @{ Firefox = $false; VCRedist = $true; DirectX = $true; Steam = $false }
+        Sovellukset = @{ Firefox = $false; VCRedist = $true; DirectX = $true; Steam = $false; Discord = $false; Spotify = $false }
         Suorituskyky = @{ Virrankaytto = 'auto'; GpuAjoitus = $true; IkkunoidutPelit = $true; HorrostilaPois = 'auto'
                           AktiivisetTunnitAlku = 8; AktiivisetTunnitLoppu = 2 }
         Tietoturva  = @{ BitLocker = $false }
@@ -241,6 +241,54 @@ function Invoke-Native {
         $ErrorActionPreference = $eap
     }
     return [pscustomobject]@{ ExitCode = $code; Output = $out }
+}
+
+function Install-SignedInstaller {
+    <# Lataa asennusohjelman, tarkistaa julkaisijan allekirjoituksen ja
+       ajaa sen. Allekirjoittamatonta tai vaaran julkaisijan tiedostoa ei ajeta.
+       Odotetaan vain asennusohjelmaa itseaan: Start-Process -Wait odottaisi
+       myos lapsiprosesseja, ja esim. Discord kaynnistyy asennuksen jalkeen
+       eika sulkeudu. #>
+    param([string]$Url, [string]$Publisher, [string]$Arguments, [string]$Name, [int[]]$OkCodes = @(0), [int]$TimeoutMinutes = 20)
+    $file = Join-Path $env:TEMP ("irequire-" + [guid]::NewGuid().ToString('N') + '.exe')
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    (New-Object System.Net.WebClient).DownloadFile($Url, $file)
+    try {
+        $sig = Get-AuthenticodeSignature -FilePath $file
+        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch [regex]::Escape($Publisher)) {
+            throw "$Name`: allekirjoitus ei kelpaa ($($sig.Status), $($sig.SignerCertificate.Subject))"
+        }
+        $p = Start-Process -FilePath $file -ArgumentList $Arguments -PassThru
+        if (-not $p.WaitForExit($TimeoutMinutes * 60000)) {
+            try { $p.Kill() } catch { }
+            throw "$Name`: asennus ei valmistunut $TimeoutMinutes minuutissa"
+        }
+        if ($OkCodes -notcontains $p.ExitCode) { throw "$Name`: asennus palautti koodin $($p.ExitCode)" }
+        Write-IRequireLog "$Name asennettu" 'Ok'
+    } finally {
+        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-UserApps {
+    <# Kayttajakohtaiset sovellukset: niiden asennusohjelmat asentavat vain
+       kirjautuneelle kayttajalle, joten ne asennetaan kayttajan istunnossa
+       (Show-Progress), ei SYSTEMina. Check = asennettu jos tiedosto on. #>
+    param([Parameter(Mandatory)]$Selection)
+    $catalog = [ordered]@{
+        Discord = @{ Url = 'https://discord.com/api/downloads/distributions/app/installers/latest?channel=stable&platform=win&arch=x64'
+                     Publisher = 'Discord Inc.'; Arguments = '-s'; Check = 'LOCALAPPDATA\Discord\Update.exe' }
+        Spotify = @{ Url = 'https://download.scdn.co/SpotifySetup.exe'
+                     Publisher = 'Spotify AB'; Arguments = '/silent'; Check = 'APPDATA\Spotify\Spotify.exe' }
+    }
+    $out = New-Object System.Collections.Generic.List[object]
+    foreach ($name in $catalog.Keys) {
+        if ($Selection.$name -is [bool] -and $Selection.$name) {
+            $c = $catalog[$name]
+            $out.Add([pscustomobject]@{ Name = $name; Url = $c.Url; Publisher = $c.Publisher; Arguments = $c.Arguments; Check = $c.Check })
+        }
+    }
+    return ,$out
 }
 
 function Test-InternetConnection {

@@ -298,26 +298,6 @@ function Invoke-UpdateRound {
     return [pscustomobject]@{ Count = $ok; Reboot = [bool]$r.RebootRequired }
 }
 
-function Install-SignedInstaller {
-    <# Lataa asennusohjelman, tarkistaa julkaisijan allekirjoituksen ja
-       ajaa sen. Allekirjoittamatonta tai vaaran julkaisijan tiedostoa ei ajeta. #>
-    param([string]$Url, [string]$Publisher, [string]$Arguments, [string]$Name, [int[]]$OkCodes = @(0))
-    $file = Join-Path $env:TEMP ("irequire-" + [guid]::NewGuid().ToString('N') + '.exe')
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    (New-Object System.Net.WebClient).DownloadFile($Url, $file)
-    try {
-        $sig = Get-AuthenticodeSignature -FilePath $file
-        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch [regex]::Escape($Publisher)) {
-            throw "$Name`: allekirjoitus ei kelpaa ($($sig.Status), $($sig.SignerCertificate.Subject))"
-        }
-        $p = Start-Process -FilePath $file -ArgumentList $Arguments -Wait -PassThru
-        if ($OkCodes -notcontains $p.ExitCode) { throw "$Name`: asennus palautti koodin $($p.ExitCode)" }
-        Write-IRequireLog "$Name asennettu" 'Ok'
-    } finally {
-        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
-    }
-}
-
 function Find-UsbStick {
     foreach ($d in @(Get-PSDrive -PSProvider FileSystem)) {
         if (Test-Path -LiteralPath (Join-Path $d.Root 'iRequire\iRequire.tag')) { return $d.Root.TrimEnd('\') }
@@ -417,6 +397,10 @@ function Invoke-StageFinish {
     Disable-NetBios
     Write-Summary -State $State
     Add-SummaryShortcut
+    # Kayttajakohtaiset sovellukset asentaa kayttajan istunto (Show-Progress).
+    # Vain valinnat (ei osoitteita eika salaisuuksia): osoitteet ovat Lib\Common.ps1:ssa.
+    $sel = [pscustomobject]@{ Discord = [bool]$config.Sovellukset.Discord; Spotify = [bool]$config.Sovellukset.Spotify }
+    $sel | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $base 'Kayttaja\kayttajasovellukset.json') -Encoding ASCII
     Remove-Item -LiteralPath (Join-Path $base 'ASENNUS-KESKEN.tag') -Force -ErrorAction SilentlyContinue
 
     # Kirjoitussuojattu tikku (tai ISO) ei saa kaataa viimeistelya.
@@ -490,7 +474,11 @@ try {
             Write-IRequireLog ('Jalkiasennus paattyi: ' + $result.Reason) 'Ok'
             if ($config.Asennus.LopuksiSammutus) {
                 # Automaattinen testi: sammutus kertoo testiajurille etta ketju on paassa.
-                # Minuutti aikaa kayttajan istunnolle nayttojen asettamiseen.
+                # Odotetaan ensin kayttajan istunnon osuus (naytot, sovellukset).
+                $userDone = Join-Path $base 'Kayttaja\naytto-valmis.txt'
+                $until = (Get-Date).AddMinutes(20)
+                while (-not (Test-Path -LiteralPath $userDone) -and (Get-Date) -lt $until) { Start-Sleep -Seconds 10 }
+                Write-IRequireLog ('Kayttajan istunto valmis: ' + (Test-Path -LiteralPath $userDone))
                 Write-IRequireLog 'Sammutetaan (LopuksiSammutus)'
                 & shutdown.exe /s /t 60 /c 'iRequire valmis, kone sammuu.'
             } elseif ($result.Result -eq 'Done') {

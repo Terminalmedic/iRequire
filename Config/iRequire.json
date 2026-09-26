@@ -71,7 +71,11 @@
     "_DirectX": "true = DirectX 9/10/11 -lisakirjastot (d3dx9, XAudio 2.7, XInput 1.3). Vanhemmat pelit tarvitsevat naita, eika Windows sisalla niita.",
     "DirectX": true,
     "_Steam": "true = asennetaan Steam suoraan Valvelta (allekirjoitus tarkistetaan). Epic, GOG ym. asennetaan itse.",
-    "Steam": false
+    "Steam": false,
+    "_Discord": "true = Discord (puhelut ja chat) kirjautuneelle kayttajalle, suoraan Discordilta (allekirjoitus tarkistetaan).",
+    "Discord": false,
+    "_Spotify": "true = Spotify kirjautuneelle kayttajalle, suoraan Spotifylta (allekirjoitus tarkistetaan).",
+    "Spotify": false
   },
 
   "Suorituskyky": {

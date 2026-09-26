@@ -195,6 +195,10 @@ virt-ls -a nvme.qcow2 '/Program Files (x86)/Steam' > out/ls_steam.txt 2>/dev/nul
 virt-ls -a nvme.qcow2 '/Program Files/Mozilla Firefox' > out/ls_firefox.txt 2>/dev/null || true
 check 'Steam asennettu (Valven allekirjoitus hyvaksytty)' "grep -qix 'steam.exe' out/ls_steam.txt"
 check 'Firefox asennettu (Mozillan allekirjoitus hyvaksytty)' "grep -qix 'firefox.exe' out/ls_firefox.txt"
+virt-ls -a nvme.qcow2 '/Users/user/AppData/Local/Discord' > out/ls_discord.txt 2>/dev/null || true
+virt-ls -a nvme.qcow2 '/Users/user/AppData/Roaming/Spotify' > out/ls_spotify.txt 2>/dev/null || true
+check 'Discord asennettu kayttajalle (kayttajan istunto)' "grep -qix 'Update.exe' out/ls_discord.txt"
+check 'Spotify asennettu kayttajalle (kayttajan istunto)' "grep -qix 'Spotify.exe' out/ls_spotify.txt"
 virt-ls -a nvme.qcow2 '/Users/Public/Desktop' > out/ls_desktop.txt 2>/dev/null || true
 check 'Yhteenveto tyopoydalla' "grep -qi 'iRequire - yhteenveto.lnk' out/ls_desktop.txt"
 check 'Selvakielinen unattend.xml poistettu' "! grep -q '__LUKUVIRHE__' out/ls_Windows_Panther.txt && ! grep -qix 'unattend.xml' out/ls_Windows_Panther.txt"

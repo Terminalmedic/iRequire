@@ -4,8 +4,10 @@
     Nayttaa kirjautuneelle kayttajalle, missa jalkiasennus on menossa.
 
 .DESCRIPTION
-    Pelkka nayttoikkuna: lukee tilatiedostoa ja lokia, ei muuta mitaan.
-    Ikkunan voi sulkea milloin tahansa, jalkiasennus jatkuu taustalla.
+    Nayttaa tilan, asettaa naytot suurimmalle taajuudelle ja lopuksi
+    asentaa valitut kayttajakohtaiset sovellukset (Discord, Spotify),
+    joita SYSTEM ei voi asentaa kayttajalle. Kirjoittaa vain Kayttaja-
+    kansioon. Ikkunan voi sulkea milloin tahansa, jalkiasennus jatkuu.
 #>
 $base = Join-Path $env:SystemDrive 'iRequire'
 $stateFile = Join-Path $base 'Logs\tila.json'
@@ -19,7 +21,25 @@ $Host.UI.RawUI.WindowTitle = 'iRequire - viimeistellaan asennusta'
 # Jo tehty: ei ikkunaa, ei muutoksia. Kayttaja saa valita taajuutensa itse.
 if (Test-Path -LiteralPath $marker) { exit 0 }
 
+. (Join-Path $base 'Lib\Common.ps1')
 . (Join-Path $base 'Lib\Display.ps1')
+
+function Install-UserApps {
+    <# Discord, Spotify ym. asentuvat vain kayttajalle, joten ne asennetaan
+       taalla (kayttajan istunto, ei jarjestelmanvalvojan oikeuksia). #>
+    $sel = $null
+    try { $sel = Get-Content -LiteralPath (Join-Path $userDir 'kayttajasovellukset.json') -Raw -ErrorAction Stop | ConvertFrom-Json } catch { return }
+    Start-Log -Path (Join-Path $userDir 'kayttaja.log')
+    foreach ($a in (Get-UserApps -Selection $sel)) {
+        $parts = $a.Check -split '\\', 2
+        $installed = Join-Path ([Environment]::GetEnvironmentVariable($parts[0])) $parts[1]
+        if (Test-Path -LiteralPath $installed) { continue }
+        Write-Host ('  Asennetaan {0}...' -f $a.Name) -ForegroundColor Gray
+        try {
+            Install-SignedInstaller -Url $a.Url -Publisher $a.Publisher -Arguments $a.Arguments -Name $a.Name
+        } catch { Write-IRequireLog $_.Exception.Message 'Varoitus' }
+    }
+}
 
 function Invoke-DisplayTuning {
     <# Naytot suurimmalle taajuudelle. Ajetaan jokaisella kirjautumisella
@@ -52,6 +72,7 @@ while ($true) {
         if ($state.Valmis) {
             # Viimeinen kerta: ajurit ovat nyt paikallaan.
             $lines = Invoke-DisplayTuning
+            Install-UserApps
             Write-Host ''
             foreach ($l in $lines) { Write-Host ('  Naytto ' + $l) -ForegroundColor Gray }
             Set-Content -LiteralPath $marker -Value ((Get-Date -Format s) + [Environment]::NewLine + ($lines -join [Environment]::NewLine)) -ErrorAction SilentlyContinue

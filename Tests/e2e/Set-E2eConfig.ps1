@@ -25,6 +25,8 @@ $c.Paivitykset.VerkonOdotusMinuuttia = 3
 # (Install-SignedInstaller) ohittaisi asennuksen vain varoituksella.
 $c.Sovellukset.Firefox = $true
 $c.Sovellukset.Steam = $true
+$c.Sovellukset.Discord = $true
+$c.Sovellukset.Spotify = $true
 $c.Asennus.LopuksiSammutus = $true
 $c.Asennus.LokiSarjaporttiin = $true
 $c | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $path -Encoding UTF8
