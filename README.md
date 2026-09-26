@@ -280,5 +280,5 @@ Policies/     Ryhmäkäytännöt, oletuskäyttäjän asetukset, poistolista
 Lib/          Yhteiset funktiot: loki, asetukset, eheys, tilakone
 Config/       Asetukset
 Tools/        Kohdekoneen esitarkistus (kulkee tikulla: iRequire\Tools)
-Tests/        Tarkistukset, Hyper-V-testikone ja QEMU/KVM-paasta paahan -testi
+Tests/        Tarkistukset, Hyper-V-testikone ja QEMU/KVM-päästä päähän -testi
 ```
