@@ -311,6 +311,67 @@ Test-Case 'Asennuksen lopputarkistus huomaa puuttuvan tiedoston' {
 }
 
 # --------------------------------------------------------------
+#  Windows-integraatio: ajetaan vain oikealla Windowsilla (CI). Kaikki
+#  on vain lukevaa - mitaan levya, nayttoa tai asetusta ei muuteta,
+#  paitsi testin oma rekisteriavain joka poistetaan.
+# --------------------------------------------------------------
+if ($env:OS -eq 'Windows_NT') {
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+    Test-Case 'Windows: levyjen luokittelu oikealla raudalla' {
+        $inv = Get-DiskInventory
+        $all = @($inv.Internal) + @($inv.Skipped)
+        Assert-True ($all.Count -ge 1) 'Yhtaan levya ei loytynyt'
+        foreach ($d in $all) { Write-Host ("          levy {0}: {1} {2} {3} {4}" -f $d.Number, $d.Bus, $d.Kind, $d.Reason, (Format-Size $d.Size)) -ForegroundColor DarkGray }
+    }
+
+    if ($isAdmin) {
+        Test-Case 'Windows: suora levyn luku Win32-kutsuilla (Reflection.Emit)' {
+            $d = @(Get-Disk | Sort-Object Number)[0]
+            $samples = Read-DiskSamples -Number $d.Number -Offsets (Get-SampleOffsets -Size $d.Size -Count 16)
+            $errs = @($samples.ToArray() | Where-Object { $_.Error }).Count
+            Assert-True ($errs -eq 0) "$errs/16 naytetta epaonnistui"
+            Assert-True (@($samples.ToArray() | Where-Object { -not $_.Zero }).Count -gt 0) 'Kaynnistyslevylta luettiin pelkkia nollia'
+        }
+
+        Test-Case 'Windows: ajastinasetusten tunnistus oikeasta bcdeditista' {
+            $text = (& bcdedit.exe /enum '{current}') -join "`n"
+            Assert-True ($text -match 'identifier') 'bcdedit ei palauttanut tulostetta'
+            [void](Get-TimerOverrides -BcdText $text)
+        }
+    }
+
+    Test-Case 'Windows: pelikunto- ja tietoturvatarkistukset ajautuvat' {
+        $in = Get-GamingInputs
+        $f = Get-GamingFindings -Memory $in.Memory -Gpus $in.Gpus -HasBattery $in.HasBattery -SystemDiskKind $in.SystemDiskKind
+        foreach ($x in $f.ToArray()) { Write-Host ("          [{0}] {1}" -f $x.Taso, $x.Teksti) -ForegroundColor DarkGray }
+        $sec = Get-SecuritySummary
+        Assert-True ($sec.Count -gt 0) 'Tietoturvayhteenveto tyhja'
+        foreach ($l in $sec) { Write-Host ("          $l") -ForegroundColor DarkGray }
+    }
+
+    Test-Case 'Windows: nayttotilojen luku (ei muutoksia)' {
+        $rows = Set-MaxRefreshRate -DryRun
+        foreach ($r in $rows) { Write-Host ("          {0} {1} {2} Hz: {3}" -f $r.Naytto, $r.Tarkkuus, $r.EnnenHz, $r.Tulos) -ForegroundColor DarkGray }
+        foreach ($r in $rows) { Assert-True ($r.EnnenHz -eq $r.JalkeenHz) 'DryRun muutti taajuutta' }
+    }
+
+    Test-Case 'Windows: kaytantotietueen kirjoitus ja poisto rekisteriin' {
+        $root = 'HKCU:\Software\iRequireTesti'
+        try {
+            Set-PolicyEntry -Entry ([pscustomobject]@{ Scope = 'User'; Key = 'A\B'; Name = 'Luku'; Type = 'DWORD'; Value = '7' }) -Root $root
+            Set-PolicyEntry -Entry ([pscustomobject]@{ Scope = 'User'; Key = 'A\B'; Name = 'Teksti'; Type = 'SZ'; Value = 'SwapEffectUpgradeEnable=1;' }) -Root $root
+            $v = Get-ItemProperty -LiteralPath "$root\A\B"
+            Assert-True ($v.Luku -eq 7 -and $v.Teksti -eq 'SwapEffectUpgradeEnable=1;') 'Arvot eivat tallentuneet'
+            Set-PolicyEntry -Entry ([pscustomobject]@{ Scope = 'User'; Key = 'A\B'; Name = 'Luku'; Type = 'DELETE'; Value = '' }) -Root $root
+            Assert-True ($null -eq (Get-ItemProperty -LiteralPath "$root\A\B").Luku) 'DELETE ei poistanut'
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# --------------------------------------------------------------
 #  Tyhjennysketju tiedostolla: levyn kahva korvataan testitiedostolla,
 #  jolloin ylikirjoitus, varmistus ja varamenetelmat ajetaan oikeasti.
 # --------------------------------------------------------------

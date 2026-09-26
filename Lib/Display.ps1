@@ -76,7 +76,9 @@ public static class IRequireDisplay {
 }
 
 function Set-MaxRefreshRate {
-    <# Palauttaa jokaisesta naytosta rivin: nimi, ennen, jalkeen, tulos. #>
+    <# Palauttaa jokaisesta naytosta rivin: nimi, ennen, jalkeen, tulos.
+       -DryRun: vain luetaan ja lasketaan, mitaan ei muuteta (CI-testit). #>
+    param([switch]$DryRun)
     Initialize-DisplayApi
     $ENUM_CURRENT_SETTINGS = -1
     $DISPLAY_DEVICE_ATTACHED_TO_DESKTOP = 1
@@ -109,7 +111,9 @@ function Set-MaxRefreshRate {
             JalkeenHz = [int]$current.Hz
             Tulos = 'jo suurin taajuus'
         }
-        if ($best) {
+        if ($best -and $DryRun) {
+            $row.Tulos = "nostettaisiin $($best.Hz) Hz:iin"
+        } elseif ($best) {
             $cur.dmDisplayFrequency = $best.Hz
             $cur.dmFields = $DM_DISPLAYFREQUENCY
             $test = [IRequireDisplay]::ChangeDisplaySettingsEx($dd.DeviceName, [ref]$cur, [IntPtr]::Zero, $CDS_TEST, [IntPtr]::Zero)
