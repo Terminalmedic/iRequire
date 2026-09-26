@@ -81,6 +81,18 @@ jobs:
           Write-Host ("ISO: {0:N1} Gt" -f ($iso.Length / 1GB))
           if ($iso.Length -lt 1GB) { throw 'ISO on epailyttavan pieni' }
 
+      - name: Siirra ISO paasta paahan -testille (valimuisti)
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path iso -Force | Out-Null
+          Move-Item D:\irq\out\iRequire.iso iso\iRequire.iso
+
+      - uses: actions/cache/save@v4
+        with:
+          path: iso/iRequire.iso
+          key: irequire-iso-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
+
       - name: Talleta rakennusloki
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,3 +101,43 @@ jobs:
           path: D:\irq\out\build.log
           if-no-files-found: warn
           retention-days: 14
+
+  e2e:
+    name: Paasta paahan (QEMU/KVM, koko ketju ilman ihmista)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 260
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: iso/iRequire.iso
+          key: irequire-iso-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+
+      - name: KVM ja tyokalut
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm || { echo 'KVM ei ole kaytettavissa tassa ajurissa'; exit 1; }
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf xorriso libguestfs-tools socat netpbm >/dev/null
+          sudo chmod 0644 /boot/vmlinuz-* || true
+          sudo mkdir -p /mnt/e2e && sudo chown "$USER" /mnt/e2e
+          df -h /mnt
+
+      - name: Aja koko ketju virtuaalikoneessa
+        run: bash Tests/e2e/run-e2e.sh "$GITHUB_WORKSPACE/iso/iRequire.iso" /mnt/e2e
+
+      - name: Talleta lokit ja kuvakaappaukset
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-tulokset
+          path: |
+            /mnt/e2e/out/
+            /mnt/e2e/shots/*.png
+          if-no-files-found: warn
+          retention-days: 7

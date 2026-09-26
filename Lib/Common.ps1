@@ -58,7 +58,7 @@ function Get-IRequireConfig {
         Alue        = @{ Kayttoliittyma = 'en-US'; Alue = 'fi-FI'; Nappaimisto = '040b:0000040b'; Aikavyohyke = 'FLE Standard Time' }
         Tyhjennys   = @{ LaskuriSekuntia = 15; Naytteita = 256; KaikkiSisaisetLevyt = $true; MinimikokoGt = 40
                          TaysiVarmistus = $false; Harjoitus = $false; TarkistaMedia = $true; OdotaVerkkovirtaa = $true }
-        Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false }
+        Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false; LopuksiSammutus = $false }
         Wlan        = @{ Ssid = ''; Salasana = '' }
         Paivitykset = @{ MaksimiKierrokset = 6; Ajurit = $true; VerkonOdotusMinuuttia = 10 }
         Sovellukset = @{ Firefox = $false; VCRedist = $true; DirectX = $true }

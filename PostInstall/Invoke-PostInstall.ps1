@@ -428,7 +428,14 @@ try {
             # Tehtavat poistetaan vasta seuraavalla kaynnistyksella, kun
             # kayttajan istunto on ehtinyt asettaa naytot (ks. alku).
             Write-IRequireLog ('Jalkiasennus paattyi: ' + $result.Reason) 'Ok'
-            if ($result.Result -eq 'Done') { Restart-ForStage $state 'asennus valmis' }
+            if ($config.Asennus.LopuksiSammutus) {
+                # Automaattinen testi: sammutus kertoo testiajurille etta ketju on paassa.
+                # Minuutti aikaa kayttajan istunnolle nayttojen asettamiseen.
+                Write-IRequireLog 'Sammutetaan (LopuksiSammutus)'
+                & shutdown.exe /s /t 60 /c 'iRequire valmis, kone sammuu.'
+            } elseif ($result.Result -eq 'Done') {
+                Restart-ForStage $state 'asennus valmis'
+            }
         }
     }
 } catch {

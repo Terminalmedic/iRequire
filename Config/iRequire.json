@@ -43,7 +43,9 @@
     "_Tuoteavain": "Tyhja = ei avainta. Esim. Microsoftin julkinen KMS-asiakasavain (GVLK) IoT Enterprise LTSC 2024:lle on KBN8V-HFGQ4-MGXVD-347P6-PDQGT. Se ei aktivoi mitaan, vain valitsee version. Ala kayta Evaluation-kuvan kanssa.",
     "Tuoteavain": "",
     "_AutomaattikirjautuminenPysyva": "false = automaattinen kirjautuminen poistetaan kun jalkiasennus valmistuu.",
-    "AutomaattikirjautuminenPysyva": false
+    "AutomaattikirjautuminenPysyva": false,
+    "_LopuksiSammutus": "true = kone sammuu (eika kaynnisty uudelleen) kun jalkiasennus on valmis. Kaytetaan automaattisessa paasta paahan -testissa; kotikaytossa false.",
+    "LopuksiSammutus": false
   },
 
   "Wlan": {

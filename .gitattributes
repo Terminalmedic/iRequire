@@ -6,3 +6,5 @@
 *.cmd text eol=crlf
 *.ini text eol=crlf
 *.xml text eol=crlf
+# Skriptit LF-rivinvaihdoin (bash)
+*.sh text eol=lf
