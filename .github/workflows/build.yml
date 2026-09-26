@@ -52,7 +52,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 150
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Lataa ISO ja tarkista tiiviste
         shell: powershell
@@ -109,7 +109,7 @@ jobs:
           New-Item -ItemType Directory -Path iso -Force | Out-Null
           .\Build\New-iRequireIso.ps1 -MediaDir D:\irq\out\Media -IsoPath (Join-Path $PWD 'iso\iRequire.iso')
 
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v5
         with:
           path: iso/iRequire.iso
           key: irequire-iso-${{ github.run_id }}-${{ github.run_attempt }}
@@ -117,7 +117,7 @@ jobs:
 
       - name: Talleta rakennusloki
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rakennusloki
           path: D:\irq\out\build.log
@@ -130,9 +130,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 330
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v5
         with:
           path: iso/iRequire.iso
           key: irequire-iso-${{ github.run_id }}-${{ github.run_attempt }}
@@ -168,7 +168,7 @@ jobs:
 
       - name: Talleta lokit ja kuvakaappaukset
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-tulokset
           path: |
