@@ -53,8 +53,13 @@ seed_disk sata 16
 # Ulkoinen USB-levy "IRQLOKI": WinPE kirjoittaa lokinsa sille (ISO on vain
 # luku), joten syy nakyy vaikka kone pysahtyisi. Samalla testataan, etta
 # ulkoiseen USB-levyyn ei kosketa: merkkitiedoston pitaa sailya.
-rm -f loki.img; truncate -s 64M loki.img; mkfs.vfat -n IRQLOKI loki.img >/dev/null
-echo "$SECRET-USB" > usb-merkki.txt; mcopy -i loki.img usb-merkki.txt ::/usb-merkki.txt
+# Kuten oikea tikku: MBR-osiotaulu ja FAT32-osio 1 MiB:n kohdalla. Ilman
+# osiotaulua (superfloppy) Windows ei liita kiinteaa levya (ajo 19).
+rm -f loki.img; truncate -s 64M loki.img
+echo 'start=2048, type=c' | sfdisk -q loki.img
+mkfs.vfat -F 32 --offset 2048 -n IRQLOKI loki.img $(( (64 * 1024 * 1024 / 512 - 2048) / 2 )) >/dev/null
+LOKI="loki.img@@1M"
+echo "$SECRET-USB" > usb-merkki.txt; mcopy -i "$LOKI" usb-merkki.txt ::/usb-merkki.txt
 
 # Kuten oikea pelikone: Secure Boot paalla Microsoftin avaimilla ja TPM 2.0.
 # Nain testataan myos etta tikku kaynnistyy Secure Bootin kanssa.
@@ -89,7 +94,7 @@ qemu-system-x86_64 \
     -device ide-cd,drive=cd,bus=ahci.1 \
     -device qemu-xhci,id=xhci \
     -drive file=loki.img,if=none,id=loki,format=raw \
-    -device usb-storage,bus=xhci.0,drive=loki,serial=IREQLOKI0001 \
+    -device usb-storage,bus=xhci.0,drive=loki,serial=IREQLOKI0001,removable=on \
     -netdev user,id=n0 -device e1000e,netdev=n0,romfile= \
     -vga std -display none \
     -monitor unix:mon.sock,server,nowait \
@@ -159,8 +164,8 @@ check() { if eval "$2"; then log "OK    $1"; else log "VIRHE $1"; fail=1; fi; }
 export LIBGUESTFS_BACKEND=direct
 
 log "Luetaan tulokset levylta (libguestfs)"
-mkdir -p out/loki; mcopy -s -n -i loki.img ::/iRequire out/loki/ 2>/dev/null || true
-check 'Ulkoinen USB-levy koskematon (merkkitiedosto sailyi)' "mtype -i loki.img ::/usb-merkki.txt 2>/dev/null | grep -q '$SECRET-USB'"
+mkdir -p out/loki; mcopy -s -n -i "$LOKI" ::/iRequire out/loki/ 2>/dev/null || true
+check 'Ulkoinen USB-levy koskematon (merkkitiedosto sailyi)' "mtype -i '$LOKI' ::/usb-merkki.txt 2>/dev/null | grep -q '$SECRET-USB'"
 check 'WinPE:n loki tallentui lokitikulle' "ls out/loki/iRequire/Reports/*/winpe.log >/dev/null 2>&1"
 virt-copy-out -a nvme.qcow2 /iRequire/Logs /iRequire/Reports out/ 2>out/guestfs.err || log "kopiointi epaonnistui: $(tail -3 out/guestfs.err)"
 for dir in /Windows/System32/config /Windows/Panther /iRequire /iRequire/Config; do

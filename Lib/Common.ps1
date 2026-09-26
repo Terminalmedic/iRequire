@@ -66,11 +66,25 @@ function Find-LogVolume {
     <# Erillinen lokitikku (nimi IRQLOKI): jos iRequire-tikku on kirjoitus-
        suojattu (ISO, Ventoy), WinPE:n loki tallentuu sille eika katoa,
        vaikka kone pysahtyisi. USB-levyja ei koskaan tyhjenneta. #>
-    try {
-        $v = @(Get-Volume -ErrorAction Stop | Where-Object { $_.FileSystemLabel -eq 'IRQLOKI' -and $_.DriveLetter }) | Select-Object -First 1
-        if ($v) { return ('{0}:' -f $v.DriveLetter) }
-    } catch { }
+    param([int]$WaitSeconds = 0)
+    # USB-levyt voivat ilmestya vasta hetken WinPE:n kaynnistyksen jalkeen.
+    $deadline = (Get-Date).AddSeconds($WaitSeconds)
+    do {
+        try {
+            $v = @(Get-Volume -ErrorAction Stop | Where-Object { $_.FileSystemLabel -eq 'IRQLOKI' -and $_.DriveLetter }) | Select-Object -First 1
+            if ($v) { return ('{0}:' -f $v.DriveLetter) }
+        } catch { }
+        if ((Get-Date) -ge $deadline) { break }
+        Start-Sleep -Seconds 2
+    } while ($true)
     return $null
+}
+
+function Get-SerialLogMethod {
+    <# Miten sarjaporttiloki kirjoitetaan (lokiin, jotta vika voidaan selvittaa). #>
+    if ($script:SerialPort) { return 'SerialPort' }
+    if ($script:SerialCmd) { return 'cmd' }
+    return 'ei kaytossa'
 }
 
 function Get-WritableDirectory {

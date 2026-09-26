@@ -1165,6 +1165,27 @@ Test-Case 'Tilakone: valmis tila ei aja mitaan' {
     Assert-True ($script:Calls.Count -eq 0) 'Valmis tila ajoi vaiheita'
 }
 
+Test-Case 'Lokitikku (IRQLOKI): loytyy nimesta, odottaa hitaasti ilmestyvaa USB-levya' {
+    $script:VolCalls = 0
+    function Start-Sleep { param([int]$Seconds, [int]$Milliseconds) }
+    function Get-Volume {
+        param($ErrorAction)
+        $script:VolCalls++
+        $vols = @([pscustomobject]@{ FileSystemLabel = 'Windows'; DriveLetter = 'C' },
+                  [pscustomobject]@{ FileSystemLabel = 'IRQLOKI'; DriveLetter = $null })
+        # USB-tikku saa asematunnuksen vasta kolmannella kyselylla.
+        if ($script:VolCalls -ge 3) { $vols += [pscustomobject]@{ FileSystemLabel = 'IRQLOKI'; DriveLetter = 'E' } }
+        return $vols
+    }
+    Assert-True ($null -eq (Find-LogVolume)) 'ilman odotusta loytyi tunnukseton levy'
+    Assert-True ($script:VolCalls -eq 1) "ilman odotusta kyselyja $($script:VolCalls)"
+    $script:VolCalls = 0
+    $v = Find-LogVolume -WaitSeconds 30
+    Assert-True ($v -eq 'E:') "odottaen: '$v'"
+    Assert-True ($script:VolCalls -eq 3) "kyselyja $($script:VolCalls)"
+    Remove-Item Function:\Get-Volume, Function:\Start-Sleep
+}
+
 Write-Host ''
 if ($failures.Count -gt 0) {
     Write-Host ("{0} tarkistusta epaonnistui" -f $failures.Count) -ForegroundColor Red

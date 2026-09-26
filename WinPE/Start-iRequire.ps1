@@ -27,7 +27,7 @@ $base = Join-Path $UsbRoot 'iRequire'
 . (Join-Path $base 'WinPE\Deploy.ps1')
 
 $runId = Get-Date -Format 'yyyyMMdd-HHmmss'
-$logVolume = Find-LogVolume
+$logVolume = Find-LogVolume -WaitSeconds 10
 $candidates = @((Join-Path $base "Reports\$runId"))
 if ($logVolume) { $candidates += (Join-Path $logVolume "iRequire\Reports\$runId") }
 $candidates += (Join-Path $env:SystemDrive "iRequire\Reports\$runId")
@@ -39,7 +39,8 @@ $configPath = Join-Path $base 'Config\iRequire.json'
 # Siihen asti kaytetaan oletuksia, jotta pysahdysruutu voidaan nayttaa.
 $configProblems = @(Test-IRequireConfig -Path $configPath)
 $config = if ($configProblems.Count -eq 0) { Get-IRequireConfig -Path $configPath } else { Get-IRequireConfig -Path (Join-Path $base 'Config\ei-ole-olemassa.json') }
-if ($config.Asennus.LokiSarjaporttiin) { Enable-SerialLog; Write-IRequireLog 'WinPE: sarjaporttiloki kaytossa' }
+if ($config.Asennus.LokiSarjaporttiin) { Enable-SerialLog; Write-IRequireLog ('WinPE: sarjaporttiloki: ' + (Get-SerialLogMethod)) }
+if ($logVolume) { Write-IRequireLog "Lokitikku: $logVolume" } else { Write-IRequireLog 'Lokitikkua (IRQLOKI) ei loytynyt' }
 $dryRun = [bool]$config.Tyhjennys.Harjoitus
 
 try { Invoke-Native powercfg.exe @('/s', '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c') | Out-Null } catch { }
