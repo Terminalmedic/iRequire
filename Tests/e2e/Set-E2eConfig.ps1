@@ -21,6 +21,10 @@ $c.Tyhjennys.MinimikokoGt = 20
 $c.Tyhjennys.OdotaVerkkovirtaa = $false
 $c.Paivitykset.MaksimiKierrokset = $UpdateRounds
 $c.Paivitykset.VerkonOdotusMinuuttia = 3
+# Valinnaiset sovellukset paalle: niiden allekirjoittajatarkistus
+# (Install-SignedInstaller) ohittaisi asennuksen vain varoituksella.
+$c.Sovellukset.Firefox = $true
+$c.Sovellukset.Steam = $true
 $c.Asennus.LopuksiSammutus = $true
 $c.Asennus.LokiSarjaporttiin = $true
 $c | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $path -Encoding UTF8
