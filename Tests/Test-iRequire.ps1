@@ -721,6 +721,30 @@ Test-Case 'Secure Boot 2023: kaynnistystiedostot vaihdetaan kuten Microsoftin sk
     } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+Test-Case 'Turvallisuus: harjoitustila pysahtyy ennen yhtakaan kirjoittavaa kutsua' {
+    # Rakennetesti: tuleva muutos ei saa siirtaa levylle kirjoittavaa kutsua
+    # harjoitustilan pysahdyksen eteen, eika laskuria/tarkistuksia sen jalkeen.
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'WinPE\Start-iRequire.ps1'), [ref]$null, [ref]$null)
+    $writers = @('Invoke-DiskWipe', 'New-WindowsPartitions', 'Install-WindowsImage', 'Add-MachineDrivers', 'Copy-Payload',
+                 'Set-BootFiles', 'Invoke-Diskpart', 'Clear-Disk', 'Initialize-Disk', 'Write-WipeCertificate', 'Write-Canaries')
+    $dryIf = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
+        $n.Clauses[0].Item1.Extent.Text -eq '$dryRun' -and $n.Clauses[0].Item2.Extent.Text -match 'Stop-Here\s+"Harjoitus valmis' }, $true))
+    Assert-True ($dryIf.Count -eq 1) "harjoitustilan pysahdyslohkoja $($dryIf.Count), odotettiin 1"
+    $stop = $dryIf[0].Extent.EndOffset
+    $calls = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)
+    foreach ($c in $calls) {
+        $name = $c.GetCommandName()
+        if ($writers -contains $name) {
+            Assert-True ($c.Extent.StartOffset -gt $stop) ("{0} (rivi {1}) ennen harjoitustilan pysahdysta" -f $name, $c.Extent.StartScriptPosition.LineNumber)
+        }
+    }
+    # Laskuri (Esc) ja tikun eheys ennen pysahdysta: harjoitus nayttaa saman kuin oikea ajo.
+    foreach ($must in @('Test-MediaManifest', 'Wait-Key', 'Select-TargetDisk')) {
+        $first = @($calls | Where-Object { $_.GetCommandName() -eq $must } | Sort-Object { $_.Extent.StartOffset } | Select-Object -First 1)
+        Assert-True ($first.Count -eq 1 -and $first[0].Extent.StartOffset -lt $stop) "$must puuttuu ennen harjoitustilan pysahdysta"
+    }
+}
+
 Test-Case 'WinPE: vain tallennusohjainten ajurit ladataan (Intel VMD tikulta)' {
     $vmd = "; Intel RST VMD`r`n[Version]`r`nSignature=`"`$WINDOWS NT`$`"`r`nClass=SCSIAdapter`r`nClassGuid={4D36E97B-E325-11CE-BFC1-08002BE10318}`r`nProvider=%INTEL%`r`n"
     Assert-True (Test-StorageDriverInf -Text $vmd) 'VMD (SCSIAdapter) ei kelvannut'
