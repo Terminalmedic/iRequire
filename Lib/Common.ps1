@@ -243,6 +243,45 @@ function Invoke-Native {
     return [pscustomobject]@{ ExitCode = $code; Output = $out }
 }
 
+function Test-IRequireConfig {
+    <# Palauttaa asetustiedoston ongelmat (tyhja = kunnossa). Ei koskaan heita.
+       Tarkeaa turvallisuudelle: Get-IRequireConfig ohittaa tuntemattomat
+       avaimet oletuksilla, joten kirjoitusvirhe "Harjoitsu": true johtaisi
+       oikeaan tyhjennykseen harjoituksen sijaan. WinPE pysahtyy ongelmiin. #>
+    param([Parameter(Mandatory)][string]$Path)
+    $problems = New-Object System.Collections.Generic.List[string]
+    if (-not (Test-Path -LiteralPath $Path)) { return $problems.ToArray() }
+    try {
+        $json = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    } catch {
+        $problems.Add(('ei ole kelvollista JSONia (tarkista pilkut ja lainausmerkit): {0}' -f $_.Exception.Message))
+        return $problems.ToArray()
+    }
+    $defaults = Get-IRequireConfig -Path (Join-Path $Path '..\ei-ole-olemassa.json')
+    $either = @('Suorituskyky.HorrostilaPois')   # 'auto' tai true/false
+    foreach ($section in $json.PSObject.Properties) {
+        if ($section.Name.StartsWith('_')) { continue }
+        if (-not $defaults.ContainsKey($section.Name)) { $problems.Add("tuntematon osio '$($section.Name)'"); continue }
+        foreach ($k in $section.Value.PSObject.Properties) {
+            if ($k.Name.StartsWith('_')) { continue }
+            $name = '{0}.{1}' -f $section.Name, $k.Name
+            if (-not $defaults[$section.Name].ContainsKey($k.Name)) { $problems.Add("tuntematon avain '$name' (kirjoitusvirhe?)"); continue }
+            $def = $defaults[$section.Name][$k.Name]
+            $v = $k.Value
+            if ($either -contains $name) {
+                if (-not ($v -is [bool] -or $v -is [string])) { $problems.Add("'$name' pitaa olla ""auto"", true tai false") }
+            } elseif ($def -is [bool]) {
+                if ($v -isnot [bool]) { $problems.Add("'$name' pitaa olla true tai false ilman lainausmerkkeja (nyt: $v)") }
+            } elseif ($def -is [int]) {
+                if (-not ($v -is [int] -or $v -is [long])) { $problems.Add("'$name' pitaa olla kokonaisluku (nyt: $v)") }
+            } elseif ($def -is [string]) {
+                if ($v -isnot [string]) { $problems.Add("'$name' pitaa olla teksti lainausmerkeissa (nyt: $v)") }
+            }
+        }
+    }
+    return $problems.ToArray()
+}
+
 function Install-SignedInstaller {
     <# Lataa asennusohjelman, tarkistaa julkaisijan allekirjoituksen ja
        ajaa sen. Allekirjoittamatonta tai vaaran julkaisijan tiedostoa ei ajeta.

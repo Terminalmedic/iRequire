@@ -258,16 +258,32 @@ Test-Case 'Kohdelevyn valinta: NVMe ennen SSD:ta ja HDD:ta, liian pieni ohitetaa
 }
 
 Test-Case 'Asetustiedostossa ei ole tuntemattomia avaimia (kirjoitusvirheet)' {
-    $json = Get-Content -LiteralPath (Join-Path $root 'Config\iRequire.json') -Raw | ConvertFrom-Json
-    $defaults = Get-IRequireConfig -Path (Join-Path $root 'ei-ole-olemassa.json')
-    foreach ($section in $json.PSObject.Properties) {
-        if ($section.Name.StartsWith('_')) { continue }
-        Assert-True ($defaults.ContainsKey($section.Name)) "Tuntematon osio: $($section.Name)"
-        foreach ($k in $section.Value.PSObject.Properties) {
-            if ($k.Name.StartsWith('_')) { continue }
-            Assert-True ($defaults[$section.Name].ContainsKey($k.Name)) "Tuntematon avain: $($section.Name).$($k.Name)"
-        }
-    }
+    $p = @(Test-IRequireConfig -Path (Join-Path $root 'Config\iRequire.json'))
+    Assert-True ($p.Count -eq 0) ('toimitettu asetustiedosto: ' + ($p -join '; '))
+}
+
+Test-Case 'Turvallisuus: virheellinen asetustiedosto pysayttaa ennen tyhjennysta' {
+    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-cfg-' + [guid]::NewGuid().ToString('N') + '.json')
+    $check = { param($text) Set-Content -LiteralPath $tmp -Value $text -Encoding UTF8; @(Test-IRequireConfig -Path $tmp) }
+    try {
+        # Kirjoitusvirhe harjoitustilan avaimessa: ilman tarkistusta oletus (false) = oikea tyhjennys.
+        $p = @(& $check '{ "Tyhjennys": { "Harjoitsu": true } }')
+        Assert-True ($p.Count -eq 1 -and $p[0] -match "Tyhjennys\.Harjoitsu") ('kirjoitusvirhe: ' + ($p -join '; '))
+        $p = @(& $check '{ "Tyhjennys": { "KaikkiSisaisetLevyt": "false" } }')
+        Assert-True ($p.Count -eq 1 -and $p[0] -match 'true tai false') ('merkkijono totuusarvona: ' + ($p -join '; '))
+        $p = @(& $check '{ "Tyhjennys": { "Harjoitus": true, } ')
+        Assert-True ($p.Count -eq 1 -and $p[0] -match 'JSON') ('rikkinainen JSON: ' + ($p -join '; '))
+        $p = @(& $check '{ "Tyhjenys": { "Harjoitus": true } }')
+        Assert-True ($p.Count -eq 1 -and $p[0] -match "osio 'Tyhjenys'") ('tuntematon osio: ' + ($p -join '; '))
+        $p = @(& $check '{ "Tyhjennys": { "LaskuriSekuntia": "15" } }')
+        Assert-True ($p.Count -eq 1 -and $p[0] -match 'kokonaisluku') ('luku tekstina: ' + ($p -join '; '))
+        $p = @(& $check '{ "_kuvaus": "x", "Tyhjennys": { "_Harjoitus": "selite", "Harjoitus": true, "LaskuriSekuntia": 30 }, "Suorituskyky": { "HorrostilaPois": false } }')
+        Assert-True ($p.Count -eq 0) ('kelvollinen hylattiin: ' + ($p -join '; '))
+        # Start-iRequire pysahtyy ongelmiin ennen yhtakaan levyoperaatiota.
+        $src = Get-Content -LiteralPath (Join-Path $root 'WinPE\Start-iRequire.ps1') -Raw
+        $stop = $src.IndexOf('if ($configProblems.Count -gt 0)')
+        Assert-True ($stop -gt 0 -and $stop -lt $src.IndexOf('Find-PendingInstall') -and $stop -lt $src.IndexOf('Get-DiskInventory')) 'asetusten tarkistus ei ole ennen levyoperaatioita'
+    } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
 }
 
 Test-Case 'Levyjen luokittelu: ulkoiset rauhaan, eMMC mukaan, muistikortit rauhaan' {

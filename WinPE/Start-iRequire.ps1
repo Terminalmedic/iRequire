@@ -30,7 +30,11 @@ $runId = Get-Date -Format 'yyyyMMdd-HHmmss'
 $reportDir = Get-WritableDirectory -Candidates @((Join-Path $base "Reports\$runId"), (Join-Path $env:SystemDrive "iRequire\Reports\$runId"))
 Start-Log -Path (Join-Path $reportDir 'winpe.log')
 if ($reportDir -notlike "$UsbRoot*") { Write-IRequireLog 'Tikulle ei voi kirjoittaa (kirjoitussuojattu tai ISO): raportit tallennetaan vain asennettavalle koneelle' 'Varoitus' }
-$config = Get-IRequireConfig -Path (Join-Path $base 'Config\iRequire.json')
+$configPath = Join-Path $base 'Config\iRequire.json'
+# Virheellinen asetustiedosto pysayttaa ennen levyihin koskemista (ks. alla).
+# Siihen asti kaytetaan oletuksia, jotta pysahdysruutu voidaan nayttaa.
+$configProblems = @(Test-IRequireConfig -Path $configPath)
+$config = if ($configProblems.Count -eq 0) { Get-IRequireConfig -Path $configPath } else { Get-IRequireConfig -Path (Join-Path $base 'Config\ei-ole-olemassa.json') }
 if ($config.Asennus.LokiSarjaporttiin) { Enable-SerialLog; Write-IRequireLog 'WinPE: sarjaporttiloki kaytossa' }
 $dryRun = [bool]$config.Tyhjennys.Harjoitus
 
@@ -105,6 +109,13 @@ try {
     Write-Host '  levyn tyhjennys ja Windowsin asennus' -ForegroundColor DarkGray
     if ($dryRun) { Write-Host '  HARJOITUSTILA - levyihin ei kirjoiteta mitaan' -ForegroundColor Magenta }
     Write-Host ''
+
+    # --- 0. Asetustiedosto: kirjoitusvirhe ei saa muuttaa harjoitusta oikeaksi ajoksi ---
+    if ($configProblems.Count -gt 0) {
+        $configProblems | ForEach-Object { Write-IRequireLog ("Asetukset: " + $_) 'Virhe' }
+        Stop-Here ("Asetustiedostossa {0} on virheita. Levyihin ei koskettu.{1}{2}" -f $configPath, [Environment]::NewLine,
+            (($configProblems | ForEach-Object { '  - ' + $_ }) -join [Environment]::NewLine))
+    }
 
     # --- 1. Keskenerainen asennus? Ei tyhjenneta vahingossa uudelleen ---
     $pending = Find-PendingInstall
