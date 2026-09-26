@@ -176,12 +176,18 @@ check 'Asetustiedosto (salasanat) poistettu' "! grep -q '__LUKUVIRHE__' out/ls_i
 
 # Rekisteri luetaan suoraan levylta: tulivatko kaytannot ja viritykset voimaan?
 # Puuttuva avain ei saa kaataa skriptia (set -e + pipefail): tarkistus kertoo.
-reg() { virt-win-reg nvme.qcow2 "$1" 2>/dev/null | tr -d '\r' || true; }
+# --unsafe-printable-strings: muuten REG_SZ tulostuu muodossa hex(1):...
+reg() { virt-win-reg --unsafe-printable-strings nvme.qcow2 "$1" 2>/dev/null | tr -d '\r' || true; }
+# Levylla ei ole CurrentControlSet-avainta (Windows luo sen kaynnistyessa):
+# oikea ControlSet00N luetaan avaimesta Select.
+cs=$(reg 'HKLM\SYSTEM\Select' | sed -n 's/^"Current"=dword:0*\([0-9a-f]*\)$/\1/Ip' | head -1)
+ccs="HKLM\\SYSTEM\\ControlSet$(printf '%03d' "$((16#${cs:-1}))")"
+log "Kaytossa oleva ControlSet: $ccs"
 reg 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' > out/reg-telemetria.txt
-reg 'HKLM\SYSTEM\CurrentControlSet\Control\CI\Config' > out/reg-ci.txt
+reg "$ccs\\Control\\CI\\Config" > out/reg-ci.txt
 reg 'HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules' > out/reg-asr.txt
-reg 'HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' > out/reg-gpu.txt
-reg 'HKLM\SYSTEM\CurrentControlSet\Control\BitLocker' > out/reg-bitlocker.txt
+reg "$ccs\\Control\\GraphicsDrivers" > out/reg-gpu.txt
+reg "$ccs\\Control\\BitLocker" > out/reg-bitlocker.txt
 check 'Telemetria tasolla 0 (kaytanto voimassa)' "grep -qi '\"AllowTelemetry\"=dword:00000000' out/reg-telemetria.txt"
 check 'Haavoittuvien ajurien estolista paalla' "grep -qi '\"VulnerableDriverBlocklistEnable\"=dword:00000001' out/reg-ci.txt"
 check 'ASR-saannot estotilassa (3 kpl)' "[ \$(grep -ci '=\"1\"' out/reg-asr.txt) -ge 3 ]"
@@ -206,6 +212,7 @@ if [ "$fail" -ne 0 ]; then
     for dir in /iRequire /iRequire/Logs /iRequire/Reports /Windows/Panther /Windows/Setup/Scripts; do
         echo "----- ls $dir -----"; virt-ls -a nvme.qcow2 "$dir" 2>&1 | head -40
     done
+    for f in out/reg-*.txt; do echo "----- $f -----"; head -n 20 "$f"; done
     echo '----- EFI-osio -----'
     virt-ls -a nvme.qcow2 -m /dev/sda1 /EFI/Microsoft/Boot 2>&1 | head -20
     for f in /Windows/Panther/setupact.log /Windows/Panther/setuperr.log /Windows/Panther/UnattendGC/setupact.log /Windows/Panther/UnattendGC/setuperr.log /iRequire/Logs/setupcomplete.log; do
