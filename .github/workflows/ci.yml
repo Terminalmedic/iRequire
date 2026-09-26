@@ -19,6 +19,7 @@ jobs:
         run: |
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          python -m pip install --quiet pyyaml
 
       # Sama skripti jota kaytetaan paikallisesti: tarkistukset + analyysi.
       - name: Tarkistukset ja analyysi (Tests/Invoke-Checks.ps1)

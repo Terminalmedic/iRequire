@@ -21,24 +21,30 @@ on:
         required: false
         default: '0'
 
-# Uusi push samaan haaraan peruu vanhan, kesken olevan ajon (Actions-minuutit).
-concurrency:
-  group: rakennus-${{ github.ref }}
-  cancel-in-progress: true
   schedule:
     # Viikoittain: sama ketju Windows Updaten kanssa. Nain huomataan jos
     # Microsoftin uusi paivitys rikkoo jotain, vaikka koodi ei muuttuisi.
     - cron: '17 2 * * 0'
   push:
     paths:
+      # Kaikki mika paatyy tikulle tai asennukseen: muutos testataan
+      # koko ketjulla virtuaalikoneessa.
       - 'Build/**'
-      - 'WinPE/Bootstrap.ps1'
-      - 'WinPE/winpeshl.ini'
-      - 'Policies/defaultuser.txt'
-      - 'Policies/Debloat.json'
+      - 'WinPE/**'
+      - 'PostInstall/**'
+      - 'Lib/**'
+      - 'Policies/**'
+      - 'Unattend/**'
+      - 'Config/**'
+      - 'Tools/**'
       - 'Tests/Test-BuildOutput.ps1'
       - 'Tests/e2e/**'
       - '.github/workflows/build.yml'
+
+# Uusi push samaan haaraan peruu vanhan, kesken olevan ajon (Actions-minuutit).
+concurrency:
+  group: rakennus-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   ISO_URL: ${{ github.event.inputs.iso_url || 'https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.1742.240906-0331.ge_release_svc_refresh_CLIENT_IOT_LTSC_EVAL_x64FRE_en-us.iso' }}
