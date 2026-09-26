@@ -243,11 +243,12 @@ Neljä tasoa. Kolme ensimmäistä ajetaan automaattisesti GitHub Actionsissa, oi
   - asennuskuva: .NET 3.5, SMB1, oletuskäyttäjän asetukset ja poistetut sovellukset
   - eheysmanifesti
 
-**3. Päästä päähän -testi virtuaalikoneessa: automaattisesti rakennuksen perään.** Rakennettu ISO käynnistetään QEMU/KVM-virtuaalikoneessa. Koneessa on UEFI sekä NVMe- ja SATA-levy, joille on kirjoitettu tunnistettavaa "salaista" dataa. Koko ketju ajetaan ilman ihmistä: WinPE, eheystarkistus, laskuri, tyhjennys, asennus, Windowsin ensikäynnistys ja jälkiasennus. Kun Windows sammuttaa itsensä, levyt tutkitaan ulkopuolelta:
-- salaista dataa ei löydy kummaltakaan levyltä
+**3. Päästä päähän -testi virtuaalikoneessa: automaattisesti rakennuksen perään.** Rakennettu ISO käynnistetään QEMU/KVM-virtuaalikoneessa, joka on varustettu kuin nykyinen pelikone: UEFI ja Secure Boot Microsoftin avaimilla, TPM 2.0 (swtpm) sekä NVMe- ja SATA-levy, joille on kirjoitettu tunnistettavaa "salaista" dataa. Koko ketju ajetaan ilman ihmistä: WinPE, eheystarkistus, laskuri, tyhjennys, asennus, Windowsin ensikäynnistys ja jälkiasennus. Kun Windows sammuttaa itsensä, levyt tutkitaan ulkopuolelta:
+- salaista dataa ei löydy kummaltakaan levyltä (jokainen tavu luetaan)
 - tyhjennystodistus hyväksyy molemmat levyt
-- jälkiasennus on valmis
-- salasanat on poistettu
+- jälkiasennus on valmis, salasanat ja selväkielinen vastaustiedosto on poistettu
+- rekisteristä: telemetria 0, haavoittuvien ajurien estolista, GPU-ajoitus, automaattisen laitesalauksen esto
+- yhteenvedosta: Defender, ASR-säännöt (Defenderin mukaan), palomuuri, .NET 3.5, Secure Boot ja TPM
 
 Kuvakaappaukset puolen minuutin välein tallentuvat artefaktiksi. Ajuri: `Tests/e2e/run-e2e.sh`.
 

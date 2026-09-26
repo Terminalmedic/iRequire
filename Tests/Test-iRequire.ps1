@@ -684,6 +684,23 @@ Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScree
     }
 }
 
+Test-Case 'Pelikunto: Secure Boot ja TPM (huijauksenestot)' {
+    $txt = { param($f) ($f.ToArray() | ForEach-Object { "$($_.Taso): $($_.Teksti)" }) -join "`n" }
+    $t = & $txt (Get-GamingFindings -HasBattery $false -SecureBoot 'On' -Tpm 'Ready')
+    Assert-True ($t -match 'OK: Secure Boot ja TPM 2.0 paalla') "kunnossa: $t"
+    Assert-True ($t -cnotmatch '(?m)^(Toimi|Huomio):') "aiheeton havainto: $t"
+    $t = & $txt (Get-GamingFindings -HasBattery $false -SecureBoot 'Off' -Tpm 'None')
+    Assert-True ($t -match 'Toimi: Secure Boot on pois') "SB pois: $t"
+    Assert-True ($t -match 'Toimi: TPM 2.0 ei ole') "TPM puuttuu: $t"
+    Assert-True ($t -notmatch '(?m)^OK: Secure Boot') 'OK vaikka puuttuu'
+    $t = & $txt (Get-GamingFindings -HasBattery $false -SecureBoot 'Legacy' -Tpm 'Old')
+    Assert-True ($t -match 'Toimi: Secure Boot ei ole kaytettavissa') "Legacy: $t"
+    Assert-True ($t -match 'Huomio: TPM on vanhaa 1.2') "TPM 1.2: $t"
+    # Tuntematon tila (tietoa ei saatu) ei tuota havaintoa suuntaan eika toiseen.
+    $t = & $txt (Get-GamingFindings -HasBattery $false)
+    Assert-True ($t -notmatch 'Secure Boot|TPM') "tuntematon tila: $t"
+}
+
 Test-Case 'Tietoturva: ASR-saantojen estotilan laskenta' {
     Assert-True ((Get-AsrBlockCount -Ids @('a', 'b', 'c') -Actions @(1, 1, 1)) -eq 3) 'kolme estotilassa'
     Assert-True ((Get-AsrBlockCount -Ids @('a', 'b', 'c') -Actions @(1, 2, 6)) -eq 1) 'valvonta (2) ja varoitus (6) eivat ole estoa'

@@ -252,7 +252,11 @@ function Get-SecuritySummary {
     try {
         $sb = Confirm-SecureBootUEFI -ErrorAction Stop
         $lines.Add(('Secure Boot: {0}' -f $(if ($sb) { 'paalla' } else { 'POIS' })))
-    } catch { $lines.Add('Secure Boot: ei tuettu (BIOS-tila)') }
+    } catch { $lines.Add('Secure Boot: ei tuettu (BIOS-tila tai laiteohjelmisto ilman Secure Bootia)') }
+    try {
+        $tpm = Get-Tpm -ErrorAction Stop
+        $lines.Add(('TPM: {0}' -f $(if (-not $tpm.TpmPresent) { 'EI LOYDY' } elseif ($tpm.TpmReady) { 'valmis' } else { 'loytyy, ei valmis' })))
+    } catch { }
     try {
         $bl = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction Stop
         $lines.Add(('BitLocker: {0}' -f $bl.VolumeStatus))

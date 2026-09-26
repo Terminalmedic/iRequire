@@ -14,16 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: iRequire-tarkistukset
-        shell: powershell
-        run: .\Tests\Test-iRequire.ps1
-
-      - name: PSScriptAnalyzer
+      - name: PSScriptAnalyzer-moduuli
         shell: powershell
         run: |
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -ExcludeRule PSAvoidUsingWriteHost, PSUseShouldProcessForStateChangingFunctions, PSUseSingularNouns, PSAvoidUsingEmptyCatchBlock, PSReviewUnusedParameter
-          if ($results) { $results | Format-Table -AutoSize | Out-String -Width 250 | Write-Host }
-          $errors = @($results | Where-Object { $_.Severity -eq 'Error' })
-          if ($errors.Count -gt 0) { throw "$($errors.Count) virhetason loydosta." }
+
+      # Sama skripti jota kaytetaan paikallisesti: tarkistukset + analyysi.
+      - name: Tarkistukset ja analyysi (Tests/Invoke-Checks.ps1)
+        shell: powershell
+        run: .\Tests\Invoke-Checks.ps1 -RequireAnalyzer

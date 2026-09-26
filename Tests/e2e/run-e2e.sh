@@ -50,7 +50,16 @@ log "Luodaan levyt (NVMe 48 Gt kohde, SATA 16 Gt data)"
 seed_disk nvme 48
 seed_disk sata 16
 
-cp /usr/share/OVMF/OVMF_VARS_4M.fd vars.fd
+# Kuten oikea pelikone: Secure Boot paalla Microsoftin avaimilla ja TPM 2.0.
+# Nain testataan myos etta tikku kaynnistyy Secure Bootin kanssa.
+OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.secboot.fd
+OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.ms.fd
+for f in "$OVMF_CODE" "$OVMF_VARS"; do [ -f "$f" ] || { log "puuttuu $f"; exit 1; }; done
+cp "$OVMF_VARS" vars.fd
+mkdir -p tpm
+swtpm socket --tpm2 --tpmstate dir=tpm --ctrl type=unixio,path=tpm/swtpm.sock --log file=out/swtpm.log &
+for _ in $(seq 1 50); do [ -S tpm/swtpm.sock ] && break; sleep 0.1; done
+[ -S tpm/swtpm.sock ] || { log "swtpm ei kaynnistynyt"; exit 1; }
 
 # --- 3. Kaynnistys --------------------------------------------
 # CD:ta ei pakoteta ensimmaiseksi: kuten tyhjassa PC:ssa, laiteohjelmisto
@@ -58,9 +67,13 @@ cp /usr/share/OVMF/OVMF_VARS_4M.fd vars.fd
 # jalkeen bcdbootin luoma Windows Boot Manager on ensimmaisena.
 log "Kaynnistetaan virtuaalikone (aikaraja $TIMEOUT_MIN min)"
 qemu-system-x86_64 \
-    -enable-kvm -machine q35 -cpu host -smp 2 -m 3072 \
-    -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-    -drive if=pflash,format=raw,file=vars.fd \
+    -enable-kvm -machine q35,smm=on -cpu host -smp 2 -m 3072 \
+    -global driver=cfi.pflash01,property=secure,value=on \
+    -global ICH9-LPC.disable_s3=1 \
+    -drive if=pflash,format=raw,unit=0,readonly=on,file="$OVMF_CODE" \
+    -drive if=pflash,format=raw,unit=1,file=vars.fd \
+    -chardev socket,id=chrtpm,path=tpm/swtpm.sock \
+    -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-crb,tpmdev=tpm0 \
     -drive file=nvme.qcow2,if=none,id=nvm,format=qcow2,discard=unmap,detect-zeroes=unmap \
     -device nvme,drive=nvm,serial=IREQNVME0001 \
     -device ahci,id=ahci \
@@ -170,6 +183,9 @@ check 'Yhteenveto kirjoitettu' "test -s out/Reports/yhteenveto.txt"
 check '.NET 3.5 kaytossa (offline-asennus viimeistelty kaynnistyksessa)' "grep -a -q '.NET Framework 3.5: Enabled' out/Reports/yhteenveto.txt"
 check 'Defender paalla' "grep -a -q 'reaaliaikainen suojaus paalla' out/Reports/yhteenveto.txt"
 check 'Palomuuri paalla' "grep -a -q 'Palomuuri: paalla kaikissa profiileissa' out/Reports/yhteenveto.txt"
+check 'Secure Boot paalla (tikku kaynnistyi Secure Bootilla)' "grep -a -q 'Secure Boot: paalla' out/Reports/yhteenveto.txt"
+check 'TPM valmis' "grep -a -q 'TPM: valmis' out/Reports/yhteenveto.txt"
+check 'Pelikunto: huijauksenestojen vaatimukset tayttyvat' "grep -a -q 'Secure Boot ja TPM 2.0 paalla' out/Reports/yhteenveto.txt"
 check 'Keskeneraisen asennuksen merkki poistettu' "grep -q 'PostInstall' out/ls_iRequire.txt && ! grep -q 'ASENNUS-KESKEN.tag' out/ls_iRequire.txt"
 check 'Selvakielinen unattend.xml poistettu' "! grep -q '__LUKUVIRHE__' out/ls_Windows_Panther.txt && ! grep -qix 'unattend.xml' out/ls_Windows_Panther.txt"
 check 'Asetustiedosto (salasanat) poistettu' "! grep -q '__LUKUVIRHE__' out/ls_iRequire_Config.txt && ! grep -q 'iRequire.json' out/ls_iRequire_Config.txt"

@@ -35,7 +35,9 @@ function Get-GamingFindings {
         $Gpus = @(),          # @{ Name; Active = bool; CurrentHz; MaxHz; Basic = bool }
         [bool]$HasBattery,
         [string]$SystemDiskKind = '',
-        [string[]]$TimerOverrides = @()
+        [string[]]$TimerOverrides = @(),
+        [ValidateSet('', 'On', 'Off', 'Legacy')][string]$SecureBoot = '',
+        [ValidateSet('', 'Ready', 'NotReady', 'Old', 'None')][string]$Tpm = ''
     )
     $f = New-Object System.Collections.Generic.List[object]
     $mem = @($Memory)
@@ -89,6 +91,24 @@ function Get-GamingFindings {
         $f.Add((New-Finding 'Toimi' 'Windows on kiintolevylla. SSD lyhentaa kaynnistyksen ja pelien latausajat moninkertaisesti ja poistaa latausnykimisen.'))
     }
 
+    # --- Huijauksenestot: Secure Boot ja TPM 2.0 ---
+    # Esim. Valorant (Vanguard) ja Battlefield 6 eivat kaynnisty ilman niita.
+    if ($SecureBoot -eq 'Legacy') {
+        $f.Add((New-Finding 'Toimi' 'Secure Boot ei ole kaytettavissa: kone kaynnistyi vanhassa BIOS-tilassa (CSM/Legacy) tai laiteohjelmisto ei tue sita. Osa kilpailullisista peleista (esim. Valorant, Battlefield 6) vaatii sen. Kytke BIOSista CSM pois, kaynnista tikku UEFI-tilassa ja asenna uudelleen.'))
+    } elseif ($SecureBoot -eq 'Off') {
+        $f.Add((New-Finding 'Toimi' 'Secure Boot on pois paalta. Osa kilpailullisista peleista (esim. Valorant, Battlefield 6) vaatii sen. Kytke se BIOSista (Secure Boot / Windows UEFI mode); uudelleenasennusta ei tarvita.'))
+    }
+    if ($Tpm -eq 'None') {
+        $f.Add((New-Finding 'Toimi' 'TPM 2.0 ei ole kaytossa. Kytke se BIOSista (Intel: PTT, AMD: fTPM). Osa huijauksenestoista (esim. Valorant) vaatii sen.'))
+    } elseif ($Tpm -eq 'Old') {
+        $f.Add((New-Finding 'Huomio' 'TPM on vanhaa 1.2-versiota. Windows 11 ja huijauksenestot odottavat versiota 2.0; tarkista BIOSista voiko sen vaihtaa.'))
+    } elseif ($Tpm -eq 'NotReady') {
+        $f.Add((New-Finding 'Huomio' 'TPM loytyy, mutta se ei ole valmiina kayttoon. Tarkista BIOSin TPM-asetukset tai tyhjenna TPM (tpm.msc).'))
+    }
+    if ($SecureBoot -eq 'On' -and $Tpm -eq 'Ready') {
+        $f.Add((New-Finding 'OK' 'Secure Boot ja TPM 2.0 paalla (huijauksenestot toimivat)'))
+    }
+
     # --- Ajastimet ---
     if (@($TimerOverrides).Count -gt 0) {
         $f.Add((New-Finding 'Huomio' ('Pakotetut ajastinasetukset poistettiin: ' + (@($TimerOverrides) -join ', ') + '. Windowsin oma valinta on nopein.')))
@@ -134,5 +154,16 @@ function Get-GamingInputs {
         $pd = Get-PhysicalDisk | Where-Object { [string]$_.DeviceId -eq [string]$part.DiskNumber } | Select-Object -First 1
         if ($pd) { $kind = [string]$pd.MediaType }
     } catch { }
-    return [pscustomobject]@{ Memory = $mem; Gpus = $gpus; HasBattery = $battery; SystemDiskKind = $kind }
+    $sb = ''
+    try { $sb = $(if (Confirm-SecureBootUEFI -ErrorAction Stop) { 'On' } else { 'Off' }) } catch [System.PlatformNotSupportedException] { $sb = 'Legacy' } catch { }
+    $tpm = ''
+    try {
+        $t = Get-Tpm -ErrorAction Stop
+        if (-not $t.TpmPresent) { $tpm = 'None' }
+        else {
+            $spec = [string](Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftTpm' -ClassName Win32_Tpm -ErrorAction SilentlyContinue).SpecVersion
+            $tpm = $(if ($spec -and $spec -notmatch '^2\.0') { 'Old' } elseif ($t.TpmReady) { 'Ready' } else { 'NotReady' })
+        }
+    } catch { }
+    return [pscustomobject]@{ Memory = $mem; Gpus = $gpus; HasBattery = $battery; SystemDiskKind = $kind; SecureBoot = $sb; Tpm = $tpm }
 }

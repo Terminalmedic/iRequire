@@ -25,9 +25,10 @@ Puhdas paatoslogiikka erotetaan Windows-kutsuista (`Get-*Choice`, `Select-*`, `G
 ## Testaus
 
 ```powershell
-.\Tests\Test-iRequire.ps1      # ~50 tarkistusta, toimii myos pwsh:lla Linuxissa
+.\Tests\Invoke-Checks.ps1      # kaikki: tarkistukset + PSScriptAnalyzer + e2e-syntaksi (sama kuin CI)
+.\Tests\Test-iRequire.ps1      # vain tarkistukset (~60), toimii myos pwsh:lla Linuxissa
 ```
 
-- CI (`.github/workflows/ci.yml`): Test-iRequire.ps1 + PSScriptAnalyzer Windows PowerShell 5.1:lla, mukana vain lukevat Windows-integraatiotestit.
-- Rakennus (`build.yml`): koko Build-iRequire.ps1 oikealla ISOlla, Test-BuildOutput.ps1 tarkistaa median, sitten paasta paahan -testi QEMU/KVM:ssa (`Tests/e2e/run-e2e.sh`).
+- CI (`.github/workflows/ci.yml`): Invoke-Checks.ps1 Windows PowerShell 5.1:lla, mukana vain lukevat Windows-integraatiotestit.
+- Rakennus (`build.yml`): koko Build-iRequire.ps1 oikealla ISOlla, Test-BuildOutput.ps1 tarkistaa median, sitten paasta paahan -testi QEMU/KVM:ssa Secure Bootilla ja TPM 2.0:lla (`Tests/e2e/run-e2e.sh`).
 - Uusi toiminto = uusi testi. Varmista etta testi kaatuu kun koodi rikotaan (mutaatio), ei vain etta se menee lapi.

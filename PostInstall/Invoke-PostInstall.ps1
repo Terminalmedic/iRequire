@@ -336,7 +336,7 @@ function Write-Summary {
     $timerFile = Join-Path $base 'Logs\ajastimet.txt'
     $timers = if (Test-Path -LiteralPath $timerFile) { @(Get-Content -LiteralPath $timerFile) } else { @() }
     $findings = Get-GamingFindings -Memory $inputs.Memory -Gpus $inputs.Gpus -HasBattery $inputs.HasBattery `
-        -SystemDiskKind $inputs.SystemDiskKind -TimerOverrides $timers
+        -SystemDiskKind $inputs.SystemDiskKind -TimerOverrides $timers -SecureBoot $inputs.SecureBoot -Tpm $inputs.Tpm
     foreach ($level in @('Toimi', 'Huomio', 'OK')) {
         foreach ($x in @($findings.ToArray() | Where-Object { $_.Taso -eq $level })) { $t.Add(('  [{0}] {1}' -f $x.Taso.ToUpper(), $x.Teksti)) }
     }
