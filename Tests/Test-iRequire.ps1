@@ -87,7 +87,9 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
 }
 
 Test-Case 'Skriptit ovat ASCII-muotoisia (WinPE-konsoli ja PS 5.1 ilman BOMia)' {
-    foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -Include *.ps1, *.cmd, *.ini, *.txt)) {
+    $files = @(Get-ChildItem -Path (Join-Path $root '*') -Recurse -File -Include *.ps1, *.cmd, *.ini, *.txt)
+    Assert-True ($files.Count -gt 15) "Tarkistettiin vain $($files.Count) tiedostoa"
+    foreach ($f in $files) {
         $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
         $start = if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { 3 } else { 0 }
         for ($i = $start; $i -lt $bytes.Length; $i++) {
