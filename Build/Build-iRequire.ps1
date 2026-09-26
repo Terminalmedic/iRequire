@@ -258,13 +258,8 @@ if (-not (Test-Path -LiteralPath $lgpo) -and -not $SkipLgpoDownload) {
 Write-IRequireLog '7/8 Kopioidaan iRequire-skriptit mediaan'
 # --------------------------------------------------------------
 $payload = Join-Path $media 'iRequire'
-New-Item -ItemType Directory -Path $payload -Force | Out-Null
-foreach ($sub in @('WinPE', 'PostInstall', 'Policies', 'Lib', 'Config', 'Unattend', 'Tools')) {
-    $s = Join-Path $repo $sub
-    if (Test-Path -LiteralPath $s) { Copy-Item -LiteralPath $s -Destination $payload -Recurse -Force }
-}
-New-Item -ItemType Directory -Path (Join-Path $payload 'Drivers') -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $payload 'Reports') -Force | Out-Null
+. (Join-Path $repo 'Lib\Media.ps1')
+Copy-RepoPayload -RepoRoot $repo -Destination $payload
 Set-Content -LiteralPath (Join-Path $payload 'iRequire.tag') -Value ('iRequire ' + (Get-Date -Format s)) -Encoding ASCII
 
 # Asennusohjelman omat vastaustiedostot sotkisivat: niita ei kayteta.

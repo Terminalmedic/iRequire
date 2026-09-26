@@ -855,6 +855,47 @@ Test-Case 'Turvallisuus: odottamaton kaatuminen WinPE:ssa ei kaynnista tikkua al
     Assert-True ($guard[0].Clauses[0].Item2.Extent.Text -notmatch 'wpeutil\.exe reboot') 'kaatumisen jalkeen uudelleenkaynnistys'
 }
 
+Test-Case 'Tikun paivitys: skriptit uusiksi, asetukset ja LGPO sailyvat, manifesti ehja' {
+    $usb = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-usb-' + [guid]::NewGuid().ToString('N'))
+    try {
+        $ir = Join-Path $usb 'iRequire'
+        foreach ($d in @('WinPE', 'Config', 'Tools', 'Drivers\vmd')) { New-Item -ItemType Directory -Path (Join-Path $ir $d) -Force | Out-Null }
+        New-Item -ItemType Directory -Path (Join-Path $usb 'sources') -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $ir 'iRequire.tag') -Value 'iRequire vanha'
+        [System.IO.File]::WriteAllBytes((Join-Path $usb 'sources\install.swm'), [byte[]](1..200 | ForEach-Object { $_ % 256 }))
+        Set-Content -LiteralPath (Join-Path $ir 'WinPE\Poistettu.ps1') -Value 'vanha'
+        Set-Content -LiteralPath (Join-Path $ir 'Tools\LGPO.exe') -Value 'lgpo'
+        Set-Content -LiteralPath (Join-Path $ir 'Drivers\vmd\iaStorVD.inf') -Value '[Version]'
+        Set-Content -LiteralPath (Join-Path $ir 'Config\iRequire.json') -Value '{ "Kayttaja": { "Nimi": "pelaaja" } }'
+        [void](New-MediaManifest -MediaRoot $usb)
+        $old = Read-MediaManifest -MediaRoot $usb
+        Assert-True ($old.ContainsKey('sources\install.swm')) 'vanha manifesti ei luettu'
+
+        Copy-RepoPayload -RepoRoot $root -Destination $ir -KeepConfig
+        [void](New-MediaManifest -MediaRoot $usb -Reuse $old)
+        Assert-True ((Get-Content -LiteralPath (Join-Path $ir 'Config\iRequire.json') -Raw) -match 'pelaaja') 'kayttajan asetukset havisivat'
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $ir 'WinPE\Poistettu.ps1'))) 'poistettu skripti jai tikulle'
+        Assert-True (Test-Path -LiteralPath (Join-Path $ir 'WinPE\Start-iRequire.ps1')) 'uusi skripti puuttuu'
+        Assert-True (Test-Path -LiteralPath (Join-Path $ir 'Tools\LGPO.exe')) 'LGPO.exe havisi'
+        Assert-True (Test-Path -LiteralPath (Join-Path $ir 'Tools\Test-TargetMachine.ps1')) 'esitarkistus puuttuu'
+        Assert-True (Test-Path -LiteralPath (Join-Path $ir 'Drivers\vmd\iaStorVD.inf')) 'tikun ajurit havisivat'
+        $p = Test-MediaManifest -MediaRoot $usb
+        Assert-True ($p.Count -eq 0) ('paivitetty tikku ei ehja: ' + ($p -join '; '))
+
+        # Config-kansio ilman asetustiedostoa: tiedosto tulee kansioon, ei Config\Config-kansioon.
+        Remove-Item -LiteralPath (Join-Path $ir 'Config\iRequire.json') -Force
+        Copy-RepoPayload -RepoRoot $root -Destination $ir -KeepConfig
+        Assert-True ((Test-Path -LiteralPath (Join-Path $ir 'Config\iRequire.json')) -and -not (Test-Path -LiteralPath (Join-Path $ir 'Config\Config'))) 'Config sisentyi'
+        [void](New-MediaManifest -MediaRoot $usb -Reuse (Read-MediaManifest -MediaRoot $usb))
+
+        # Uudelleenkaytetty tiiviste ei peita vioittumista: sama koko, eri sisalto -> WinPE huomaa.
+        [System.IO.File]::WriteAllBytes((Join-Path $usb 'sources\install.swm'), [byte[]](1..200 | ForEach-Object { ($_ + 7) % 256 }))
+        [void](New-MediaManifest -MediaRoot $usb -Reuse (Read-MediaManifest -MediaRoot $usb))
+        $p = Test-MediaManifest -MediaRoot $usb
+        Assert-True ($p.Count -ge 1) 'vioittunut asennuskuva meni lapi'
+    } finally { Remove-Item -LiteralPath $usb -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 Test-Case 'Asennus: kayttoliittyman kieli valitaan kuvan kielista' {
     Assert-True ((Select-UiLanguage -Wanted 'en-US' -Installed @('en-US')) -eq 'en-US') 'sama kieli'
     Assert-True ((Select-UiLanguage -Wanted 'en-US' -Installed @('fi-FI')) -eq 'fi-FI') 'suomenkielinen ISO'

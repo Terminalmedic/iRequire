@@ -74,6 +74,9 @@ Get-Disk | Where-Object BusType -eq USB
 
 # 3b. tai ISOksi (virtuaalikoneet, Ventoy)
 .\Build\New-iRequireIso.ps1
+
+# Myohemmin: uusimmat skriptit valmiille tikulle minuutissa (asetukset ja ajurit sailyvat)
+.\Build\Update-iRequireUsb.ps1 -UsbRoot E:
 ```
 
 ### Secure Boot -varmenne: 2011 vai 2023

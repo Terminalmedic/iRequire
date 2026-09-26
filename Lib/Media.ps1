@@ -39,13 +39,21 @@ function Test-ManifestExcluded {
 function New-MediaManifest {
     <# Kirjoittaa manifestin median juureen. Polut ovat suhteellisia ja
        kenoviivoilla, jotta ne toimivat WinPE:ssa milla tahansa kirjaimella. #>
-    param([Parameter(Mandatory)][string]$MediaRoot)
+    param(
+        [Parameter(Mandatory)][string]$MediaRoot,
+        # Vanhan manifestin tiivisteet iRequire-kansion ulkopuolisille, samankokoisille
+        # tiedostoille (asennuskuva ~5 Gt). Turvallista: WinPE laskee tiivisteet
+        # itse ennen tyhjennysta, joten vioittunut tiedosto huomataan silti.
+        [hashtable]$Reuse = @{}
+    )
     $root = (Resolve-Path -LiteralPath $MediaRoot).Path.TrimEnd('\', '/')
     $files = New-Object System.Collections.Generic.List[object]
     foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -File | Sort-Object FullName)) {
         $rel = $f.FullName.Substring($root.Length + 1).Replace('/', '\')
         if (Test-ManifestExcluded $rel) { continue }
-        $files.Add([ordered]@{ Polku = $rel; Koko = [int64]$f.Length; Sha256 = (Get-FileSha256 -Path $f.FullName) })
+        $old = $Reuse[$rel]
+        $sha = if ($old -and -not $rel.StartsWith('iRequire\') -and [int64]$old.Koko -eq [int64]$f.Length) { [string]$old.Sha256 } else { Get-FileSha256 -Path $f.FullName }
+        $files.Add([ordered]@{ Polku = $rel; Koko = [int64]$f.Length; Sha256 = $sha })
     }
     $doc = [ordered]@{ Luotu = (Get-Date).ToString('s'); Tiedostot = $files.ToArray() }
     $out = Join-Path $root $script:ManifestName
@@ -163,4 +171,42 @@ function Select-ImageEdition {
         if ($hit) { return $hit }
     }
     return $null
+}
+
+function Read-MediaManifest {
+    <# Olemassa olevan manifestin tiedot polun mukaan (tyhja jos ei ole). #>
+    param([Parameter(Mandatory)][string]$MediaRoot)
+    $map = @{}
+    $p = Join-Path $MediaRoot $script:ManifestName
+    if (-not (Test-Path -LiteralPath $p)) { return $map }
+    try { $doc = Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $map }
+    foreach ($e in @($doc.Tiedostot)) { if ($e.Polku) { $map[[string]$e.Polku] = $e } }
+    return $map
+}
+
+$script:PayloadDirs = @('WinPE', 'PostInstall', 'Policies', 'Lib', 'Unattend')
+
+function Copy-RepoPayload {
+    <# Repon skriptit tikun iRequire-kansioon. Skriptikansiot peilataan
+       (poistetut tiedostot eivat jaa). Tools: skriptit paivitetaan, LGPO.exe
+       jaa. Config: -KeepConfig sailyttaa kayttajan iRequire.json:n. #>
+    param([Parameter(Mandatory)][string]$RepoRoot, [Parameter(Mandatory)][string]$Destination, [switch]$KeepConfig)
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    foreach ($sub in $script:PayloadDirs) {
+        $d = Join-Path $Destination $sub
+        if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force }
+        Copy-Item -LiteralPath (Join-Path $RepoRoot $sub) -Destination $Destination -Recurse -Force
+    }
+    $tools = Join-Path $RepoRoot 'Tools'
+    if (Test-Path -LiteralPath $tools) {
+        New-Item -ItemType Directory -Path (Join-Path $Destination 'Tools') -Force | Out-Null
+        foreach ($f in @(Get-ChildItem -LiteralPath $tools -File)) { Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $Destination 'Tools') -Force }
+    }
+    $cfgDst = Join-Path $Destination 'Config'
+    if (-not ($KeepConfig -and (Test-Path -LiteralPath (Join-Path $cfgDst 'iRequire.json')))) {
+        # Sisalto eika kansio: olemassa olevaan kansioon kopioitu kansio sisentyisi (Config\Config).
+        New-Item -ItemType Directory -Path $cfgDst -Force | Out-Null
+        Copy-Item -Path (Join-Path $RepoRoot 'Config\*') -Destination $cfgDst -Recurse -Force
+    }
+    foreach ($d in @('Drivers', 'Reports')) { New-Item -ItemType Directory -Path (Join-Path $Destination $d) -Force | Out-Null }
 }
