@@ -71,7 +71,7 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
         'Start-VM','Stop-Service','Unregister-ScheduledTask','Update-MpSignature','Update-Disk',
         'Enable-WindowsOptionalFeature','Get-Tpm','Get-BitLockerVolume','Add-BitLockerKeyProtector',
         'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-NetFirewallProfile',
-        'Confirm-SecureBootUEFI','Set-CimInstance')
+        'Confirm-SecureBootUEFI','Set-CimInstance','Get-WindowsPackage')
     $defined = @{}
     $calls = @{}
     foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.ps1)) {

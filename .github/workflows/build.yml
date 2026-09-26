@@ -1,0 +1,91 @@
+name: Rakennus
+
+# Ajaa koko Build-iRequire.ps1:n oikealla Windowsilla: ADK + WinPE,
+# virallinen ISO, DISM-muokkaukset, eheysmanifesti ja ISO-levykuva.
+# Sen jalkeen Test-BuildOutput.ps1 liittaa kuvat vain luku -tilassa ja
+# tarkistaa sisallon. Raskas (~5 Gt lataus, 30-60 min), joten ajetaan
+# vain kun rakennukseen liittyvat tiedostot muuttuvat tai kasin.
+on:
+  workflow_dispatch:
+    inputs:
+      iso_url:
+        description: 'Windows-ISOn osoite (oletus: Microsoftin IoT Enterprise LTSC 2024 Evaluation x64 en-us)'
+        required: false
+        default: 'https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.1742.240906-0331.ge_release_svc_refresh_CLIENT_IOT_LTSC_EVAL_x64FRE_en-us.iso'
+      iso_sha256:
+        description: 'ISOn SHA-256 (tarkistetaan ennen kayttoa)'
+        required: false
+        default: '2cee70bd183df42b92a2e0da08cc2bb7a2a9ce3a3841955a012c0f77aeb3cb29'
+  push:
+    paths:
+      - 'Build/**'
+      - 'WinPE/Bootstrap.ps1'
+      - 'WinPE/winpeshl.ini'
+      - 'Policies/defaultuser.txt'
+      - 'Policies/Debloat.json'
+      - 'Tests/Test-BuildOutput.ps1'
+      - '.github/workflows/build.yml'
+
+env:
+  ISO_URL: ${{ github.event.inputs.iso_url || 'https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.1742.240906-0331.ge_release_svc_refresh_CLIENT_IOT_LTSC_EVAL_x64FRE_en-us.iso' }}
+  ISO_SHA256: ${{ github.event.inputs.iso_sha256 || '2cee70bd183df42b92a2e0da08cc2bb7a2a9ce3a3841955a012c0f77aeb3cb29' }}
+
+jobs:
+  build:
+    name: Rakenna ja tarkista media
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lataa ISO ja tarkista tiiviste
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path D:\irq -Force | Out-Null
+          & curl.exe -L --fail --retry 3 --silent --show-error -o D:\irq\windows.iso $env:ISO_URL
+          if ($LASTEXITCODE -ne 0) { throw "Lataus epaonnistui ($LASTEXITCODE)" }
+          $h = (Get-FileHash -Algorithm SHA256 D:\irq\windows.iso).Hash
+          Write-Host "SHA-256: $h"
+          if ($h -ne $env:ISO_SHA256.ToUpper()) { throw "Tiiviste ei tasmaa: odotettiin $env:ISO_SHA256" }
+
+      - name: Asenna Windows ADK (Deployment Tools) ja WinPE-lisaosa
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & curl.exe -L --fail --retry 3 --silent --show-error -o D:\irq\adksetup.exe 'https://go.microsoft.com/fwlink/?linkid=2289980'
+          & curl.exe -L --fail --retry 3 --silent --show-error -o D:\irq\adkwinpesetup.exe 'https://go.microsoft.com/fwlink/?linkid=2289981'
+          foreach ($f in @('D:\irq\adksetup.exe', 'D:\irq\adkwinpesetup.exe')) {
+            $sig = Get-AuthenticodeSignature $f
+            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw "$f allekirjoitus ei kelpaa" }
+          }
+          $p = Start-Process D:\irq\adksetup.exe -ArgumentList '/quiet /norestart /features OptionId.DeploymentTools' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "ADK: $($p.ExitCode)" }
+          $p = Start-Process D:\irq\adkwinpesetup.exe -ArgumentList '/quiet /norestart /features OptionId.WindowsPreinstallationEnvironment' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "WinPE: $($p.ExitCode)" }
+
+      - name: Rakenna media (Build-iRequire.ps1)
+        shell: powershell
+        run: .\Build\Build-iRequire.ps1 -IsoPath D:\irq\windows.iso -WorkDir D:\irq\out
+
+      - name: Tarkista media sisaltapain (Test-BuildOutput.ps1)
+        shell: powershell
+        run: .\Tests\Test-BuildOutput.ps1 -MediaDir D:\irq\out\Media -MountDir D:\irq\tarkistus
+
+      - name: Tee ISO-levykuva (New-iRequireIso.ps1)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\Build\New-iRequireIso.ps1 -MediaDir D:\irq\out\Media -IsoPath D:\irq\out\iRequire.iso
+          $iso = Get-Item D:\irq\out\iRequire.iso
+          Write-Host ("ISO: {0:N1} Gt" -f ($iso.Length / 1GB))
+          if ($iso.Length -lt 1GB) { throw 'ISO on epailyttavan pieni' }
+
+      - name: Talleta rakennusloki
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rakennusloki
+          path: D:\irq\out\build.log
+          if-no-files-found: warn
+          retention-days: 14
