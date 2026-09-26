@@ -984,6 +984,7 @@ Test-Case 'Tilakone: kaikki vaiheet kerran, yksi kaynnistys' {
     $r = Invoke-SimulatedBoots -Stages $simStages -Handlers $h
     Assert-True ($r.Result -eq 'Done' -and $r.Boots -eq 1) "$($r.Result) $($r.Boots)"
     Assert-True (($script:Calls -join '') -eq 'APB') "Jarjestys $($script:Calls -join '')"
+    Assert-True (@(@($r.State.Ohitetut) | Where-Object { $_ }).Count -eq 0) 'onnistuneessa ajossa ohitettuja'
 }
 
 Test-Case 'Tilakone: paivityskierrokset jatkuvat kaynnistysten yli, valmis vaihe ei toistu' {
@@ -1017,6 +1018,9 @@ Test-Case 'Tilakone: virhe yritetaan kerran uudelleen ja ohitetaan sitten' {
     $r = Invoke-SimulatedBoots -Stages $simStages -Handlers $h
     Assert-True ($r.Result -eq 'Done') $r.Result
     Assert-True (($script:Calls -join '') -eq 'AAPB') "Jarjestys $($script:Calls -join '')"
+    # Ohitus kirjataan (ja sailyy tilatiedoston JSON-kierroksen yli) yhteenvetoa varten.
+    $sk = @(@($r.State.Ohitetut) | Where-Object { $_ })
+    Assert-True ($sk.Count -eq 1 -and $sk[0] -eq 'A: rikki') ("Ohitetut: " + ($sk -join ' | '))
 }
 
 Test-Case 'Tilakone: jatkuvasti kaatuva viimeinen vaihe paattyy ilman silmukkaa' {
@@ -1031,6 +1035,8 @@ Test-Case 'Tilakone: jokainen vaihe kaatuu -> silti paattyy' {
     $r = Invoke-SimulatedBoots -Stages $simStages -Handlers $h
     Assert-True ($r.Result -ne 'SILMUKKA') 'Jai silmukkaan'
     Assert-True ($r.Boots -le 7) "Kaynnistyksia $($r.Boots)"
+    $sk = @(@($r.State.Ohitetut) | Where-Object { $_ })
+    Assert-True ($sk.Count -eq 3) ("kaikki kolme ohitettua kirjattu: " + ($sk -join ' | '))
 }
 
 Test-Case 'Tilakone: vioittunut vaihe tilatiedostossa aloittaa alusta' {

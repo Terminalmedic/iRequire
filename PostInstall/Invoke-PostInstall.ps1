@@ -319,6 +319,14 @@ function Write-Summary {
     $t.Add('Paivityksia asennettu: ' + $State.Paivityksia)
     $t.Add('Internet:  ' + $(if (Test-InternetConnection) { 'toimii' } else { 'EI YHTEYTTA' }))
     $t.Add('')
+    $skipped = @(@($State.Ohitetut) | Where-Object { $_ })
+    if ($skipped.Count -gt 0) {
+        $t.Add('OHITETUT VAIHEET - asennus ei ole taydellinen (loki: C:\iRequire\Logs\postinstall.log):')
+        foreach ($x in $skipped) { $t.Add('  [TOIMI] ' + $x) }
+    } else {
+        $t.Add('Kaikki vaiheet onnistuivat.')
+    }
+    $t.Add('')
     if ($problems.Count -gt 0) {
         $t.Add('Laitteet ilman toimivaa ajuria:')
         foreach ($p in $problems) { $t.Add(('  - {0} [{1}] {2}' -f $p.FriendlyName, $p.Class, $p.InstanceId)) }

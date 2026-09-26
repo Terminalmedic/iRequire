@@ -183,6 +183,7 @@ fi
 check 'Jalkiasennus valmis (tila.json)' "python3 -c \"import json,sys; d=json.load(open('out/Logs/tila.json',encoding='utf-8-sig')); sys.exit(0 if d.get('Valmis') else 1)\""
 check 'Tyhjennystodistus: molemmat levyt HYVAKSYTTY' "[ \$(cat out/Reports/tyhjennystodistus-*.txt 2>/dev/null | grep -c 'Varmistus:    HYVAKSYTTY') -eq 2 ]"
 check 'Yhteenveto kirjoitettu' "test -s out/Reports/yhteenveto.txt"
+check 'Yhtaan jalkiasennuksen vaihetta ei ohitettu' "grep -a -q 'Kaikki vaiheet onnistuivat' out/Reports/yhteenveto.txt"
 check '.NET 3.5 kaytossa (offline-asennus viimeistelty kaynnistyksessa)' "grep -a -q '.NET Framework 3.5: Enabled' out/Reports/yhteenveto.txt"
 check 'Defender paalla' "grep -a -q 'reaaliaikainen suojaus paalla' out/Reports/yhteenveto.txt"
 check 'Palomuuri paalla' "grep -a -q 'Palomuuri: paalla kaikissa profiileissa' out/Reports/yhteenveto.txt"

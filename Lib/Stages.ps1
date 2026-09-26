@@ -12,13 +12,14 @@
 #   - Virheen jalkeen vaihe yritetaan uudelleen. $MaxErrors virheen
 #     jalkeen se ohitetaan. Jos viimeinen vaihe ohitetaan, kone ei
 #     kaynnisty enaa uudelleen - silmukka on mahdoton.
+#   - Ohitetut vaiheet (ja virhe) kirjataan tilaan: Ohitetut -> yhteenveto.
 #   - Tuntematon vaihe tilatiedostossa (vioittunut) aloittaa alusta.
 # ==============================================================
 
 function New-StageState {
     param([Parameter(Mandatory)][string[]]$Stages, $Existing)
     $s = if ($Existing) { $Existing } else { [pscustomobject]@{} }
-    $defaults = [ordered]@{ Vaihe = $Stages[0]; Kierros = 0; Valmis = $false; Viesti = ''; Paivityksia = 0; Virheita = 0 }
+    $defaults = [ordered]@{ Vaihe = $Stages[0]; Kierros = 0; Valmis = $false; Viesti = ''; Paivityksia = 0; Virheita = 0; Ohitetut = @() }
     foreach ($k in $defaults.Keys) {
         if ($s.PSObject.Properties.Name -notcontains $k) { $s | Add-Member -NotePropertyName $k -NotePropertyValue $defaults[$k] }
     }
@@ -55,7 +56,8 @@ function Invoke-StageMachine {
         try {
             $out = @(& $Handlers[$name] $State)
         } catch {
-            Write-IRequireLog ("VIRHE vaiheessa {0}: {1}" -f $name, $_.Exception.Message) 'Virhe'
+            $msg = [string]$_.Exception.Message
+            Write-IRequireLog ("VIRHE vaiheessa {0}: {1}" -f $name, $msg) 'Virhe'
             Write-IRequireLog ($_.ScriptStackTrace) 'Virhe'
             $State.Virheita++
             if ($State.Virheita -lt $MaxErrors) {
@@ -63,6 +65,9 @@ function Invoke-StageMachine {
                 return [pscustomobject]@{ Result = 'Reboot'; Reason = "virhe vaiheessa $name, yritetaan uudelleen" }
             }
             Write-IRequireLog ("Vaihe {0} ohitetaan {1} virheen jalkeen" -f $name, $State.Virheita) 'Varoitus'
+            # Kayttajalle yhteenvetoon: valmis kone, josta puuttuu vaihe, ei saa nayttaa onnistuneelta.
+            if ($msg.Length -gt 200) { $msg = $msg.Substring(0, 200) }
+            $State.Ohitetut = @(@($State.Ohitetut) | Where-Object { $_ }) + @(('{0}: {1}' -f $name, $msg))
             $State.Virheita = 0
             if ($i + 1 -ge $Stages.Count) {
                 $State.Valmis = $true
