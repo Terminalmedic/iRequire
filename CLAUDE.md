@@ -27,7 +27,7 @@ Puhdas paatoslogiikka erotetaan Windows-kutsuista (`Get-*Choice`, `Select-*`, `G
 
 ```powershell
 .\Tests\Invoke-Checks.ps1      # kaikki: tarkistukset + PSScriptAnalyzer + e2e-syntaksi (sama kuin CI)
-.\Tests\Test-iRequire.ps1      # vain tarkistukset (~60), toimii myos pwsh:lla Linuxissa
+.\Tests\Test-iRequire.ps1      # vain tarkistukset (~65), toimii myos pwsh:lla Linuxissa
 ```
 
 - CI (`.github/workflows/ci.yml`): Invoke-Checks.ps1 Windows PowerShell 5.1:lla, mukana vain lukevat Windows-integraatiotestit.

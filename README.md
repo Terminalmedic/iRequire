@@ -24,18 +24,31 @@ Windows
  └─ 13. Kirjautuessa: näytöt suurimmalle virkistystaajuudelle
 ```
 
-## Ensimmäinen kerta: näin varmistat että se toimii
+## Pika-aloitus
 
-Levyn tyhjennys on peruuttamaton, joten ennen oikeaa konetta käy nämä vaiheet läpi järjestyksessä:
+Levyn tyhjennys on peruuttamaton. Tee vaiheet tässä järjestyksessä, niin ensimmäinen oikea ajo on tylsä.
 
-0. **Esitarkistus kohdekoneella** (jos siinä on vielä toimiva Windows): aja järjestelmänvalvojana tikulta `iRequire\Tools\Test-TargetMachine.ps1`. Se ei muuta konetta, ja kertoo:
-   - kumpi Secure Boot -varmenne tikulle tarvitaan (ks. alla)
-   - tarvitseeko levyohjain valmistajan ajurin (Intel RST/VMD). `-ExportDrivers` vie sen suoraan tikulle.
-   - TPM, Secure Boot, RAM, näytöt ja levyt, jotka tyhjennettäisiin
-1. **Testit:** `.\Tests\Test-iRequire.ps1`. Kaikkien 30+ tarkistuksen pitää mennä läpi.
-2. **Virtuaalikone:** `.\Build\New-iRequireIso.ps1` ja sitten `.\Tests\New-TestVm.ps1 -IsoPath .\Out\iRequire.iso`. Hyper-V-kone saa kaksi levyä täynnä testidataa. Anna ketjun ajaa loppuun ja tarkista `C:\iRequire\Reports`.
-3. **Harjoitus oikealla koneella:** aseta tikulla `iRequire\Config\iRequire.json` → `"Harjoitus": true`. Tikku tekee kaiken muun (eheys, levyjen tunnistus, suora luku, kohdelevyn valinta), mutta ei kirjoita levyille mitään. Tulos on lokissa `iRequire\Reports`.
-4. **Oikea ajo:** `"Harjoitus": false`.
+**1. Rakennuskone** (mikä tahansa Windows 10/11, järjestelmänvalvojana)
+- Asenna [Windows ADK ja WinPE-lisäosa](https://learn.microsoft.com/windows-hardware/get-started/adk-install).
+- Lataa ISO. Pysyvään pelikoneeseen tavallinen [Windows 11 -ISO](https://www.microsoft.com/software-download/windows11): se toimii aktivoimattomana pysyvästi (ks. [Versio ja lisenssi](#versio-ja-lisenssi)). Kokeiluun kelpaa IoT LTSC Evaluation, joka vanhenee 90 päivässä.
+
+**2. Tikku**
+```powershell
+.\Build\Build-iRequire.ps1 -IsoPath D:\Win11.iso -Edition '*Pro'   # IoT LTSC -ISOlla ilman -Editionia
+Get-Disk | Where-Object BusType -eq USB                             # tikun numero
+.\Build\New-iRequireUsb.ps1 -DiskNumber 3
+```
+Halutessasi muokkaa tikulla `iRequire\Config\iRequire.json` (käyttäjänimi, WLAN, Steam ...).
+
+**3. Esitarkistus kohdekoneella** (jos siinä on vielä toimiva Windows): aja järjestelmänvalvojana tikulta `iRequire\Tools\Test-TargetMachine.ps1 -ExportDrivers`. Se ei muuta konetta. Se kertoo, kumpi [Secure Boot -varmenne](#secure-boot--varmenne-2011-vai-2023) tikulle tarvitaan, ja vie levyohjaimen ajurin (Intel RST/VMD) tikulle, jos sellainen tarvitaan. Näet myös levyt, jotka tyhjennettäisiin, ja pelikuntohavainnot (XMP, TPM ...).
+
+**4. Harjoitus:** aseta tikulla `"Harjoitus": true` ja käynnistä kohdekone tikulta (käynnistysvalikko on yleensä F12, F11, F8 tai Esc). Tikku tekee kaiken muun, mutta ei kirjoita levyille mitään. Tarkista ruudulta levyt ja lopuksi loki tikun kansiosta `iRequire\Reports`.
+
+**5. Oikea ajo:** aseta `"Harjoitus": false`, **irrota levyt, joita et halua tyhjentää** (oletuksena kaikki sisäiset levyt tyhjennetään), ja käynnistä tikulta. Laskurin aikana Esc peruu kaiken. Sen jälkeen koneeseen ei tarvitse koskea: se käynnistyy useita kertoja itsestään.
+
+**6. Valmis:** lue `C:\iRequire\Reports\yhteenveto.txt` (kopio myös tikulla). Pelikuntoraportti kertoo, mitä vielä kannattaa tehdä, esim. näytönohjaimen valmistajan ajuri ja XMP BIOSista. Jos jokin pysähtyy, katso [Vianetsintä](#vianetsintä).
+
+Kehittäjälle: `.\Tests\Invoke-Checks.ps1` ajaa kaikki tarkistukset, ja [Testaus](#testaus) kertoo, miten koko ketju testataan virtuaalikoneessa.
 
 ## Mitä tarvitaan
 
@@ -212,7 +225,9 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 - **Tikun eheys** tarkistetaan ennen tyhjennystä. Vioittunut kopio pysäyttää ajon ennen kuin mitään on menetetty.
 - **Uudelleentyhjennyksen esto:** jos kone käynnistyy asennuksen jälkeen vahingossa taas tikulta, tikku tunnistaa keskeneräisen asennuksen ja käynnistää kiintolevyltä.
 - **Virheessä pysähdytään:** WinPE ei käynnisty uudelleen silmukkaan. Jälkiasennuksen tilakone yrittää vaihetta kahdesti, ohittaa sen sitten eikä voi jäädä uudelleenkäynnistyssilmukkaan (testattu simuloiduilla käynnistyksillä).
-- **Salasanat:** `Windows\Panther\unattend.xml` poistetaan heti, asetustiedosto lukitaan vain järjestelmänvalvojille ja poistetaan lopuksi, ja automaattinen kirjautuminen poistetaan.
+- **Salasanat:** `Windows\Panther\unattend.xml` poistetaan heti, asetustiedosto lukitaan vain järjestelmänvalvojille ja poistetaan lopuksi, ja automaattinen kirjautuminen poistetaan salasanoineen (myös LSA-salaisuus `DefaultPassword`, jota pelkkä rekisteriarvon poisto ei poista).
+- **Jälkiasennuksen skriptit:** SYSTEM ajaa ne kansiosta `C:\iRequire`, joka lukitaan: käyttäjät saavat vain lukea. Muuten C:n juureen luotu kansio perisi kaikille muokkausoikeuden, ja tavallisin oikeuksin ajettu haittaohjelma voisi saada SYSTEM-oikeudet.
+- **Harjoitustila** pysähtyy ennen yhtäkään levylle kirjoittavaa kutsua; rakennetesti valvoo järjestystä.
 - **Kirjoitussuojattu tikku tai ISO:** raportit tallennetaan asennettavalle koneelle.
 
 ## Vianetsintä
@@ -237,7 +252,7 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 
 Neljä tasoa. Kolme ensimmäistä ajetaan automaattisesti GitHub Actionsissa, oikealla Windowsilla (Windows PowerShell 5.1, sama kuin WinPE:ssä) tai virtuaalikoneessa:
 
-**1. `Tests\Test-iRequire.ps1`: jokaisella commitilla.** Noin 50 tarkistusta:
+**1. `Tests\Invoke-Checks.ps1` (`Test-iRequire.ps1` + PSScriptAnalyzer): jokaisella commitilla.** Noin 65 tarkistusta, mm.:
 - **Tyhjennys päästä päähän:** levy korvataan testitiedostolla, jolle ajetaan HDD-ylikirjoitus, NVMe:n kryptografinen tyhjennys, "valehteleva" SSD, tukematon komento ja simuloitu viallinen sektori. Todistus kirjoitetaan.
 - **Tilakone:** simuloidut uudelleenkäynnistykset, virheet ja vioittunut tila. Silmukka on todistetusti mahdoton.
 - **Pelikunto- ja virityspäätökset:** RAM, näytöt, näytönohjaimen tunnistus ja virrankäyttö.
@@ -267,7 +282,7 @@ Neljä tasoa. Kolme ensimmäistä ajetaan automaattisesti GitHub Actionsissa, oi
 
 Kuvakaappaukset puolen minuutin välein tallentuvat artefaktiksi. Ajuri: `Tests/e2e/run-e2e.sh`.
 
-**4. Harjoitustila oikealla koneella: sinä, ennen ensimmäistä oikeaa ajoa.** Virtuaalikone ei kerro, tunnistaako WinPE juuri sinun koneesi levyohjaimen. Harjoitustila kertoo, ks. [ensimmäinen kerta](#ensimmäinen-kerta-näin-varmistat-että-se-toimii).
+**4. Harjoitustila oikealla koneella: sinä, ennen ensimmäistä oikeaa ajoa.** Virtuaalikone ei kerro, tunnistaako WinPE juuri sinun koneesi levyohjaimen. Harjoitustila kertoo, ks. [pika-aloitus](#pika-aloitus).
 
 ## Rakenne
 
