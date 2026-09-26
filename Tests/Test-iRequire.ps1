@@ -694,6 +694,20 @@ Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScree
     }
 }
 
+Test-Case 'Rakennus: Windows-version valinta eri ISOista' {
+    $pat = @('*IoT Enterprise LTSC*', '*Enterprise LTSC*', '*Pro', '*Enterprise*')
+    $img = { param([string[]]$n) $i = 0; $n | ForEach-Object { $i++; [pscustomobject]@{ ImageIndex = $i; ImageName = $_ } } }
+    $consumer = & $img @('Windows 11 Home', 'Windows 11 Home N', 'Windows 11 Education', 'Windows 11 Pro', 'Windows 11 Pro N', 'Windows 11 Pro Education', 'Windows 11 Pro for Workstations')
+    Assert-True ((Select-ImageEdition -Images $consumer -Patterns $pat).ImageName -eq 'Windows 11 Pro') 'kuluttaja-ISO: Pro'
+    $iot = & $img @('Windows 11 IoT Enterprise LTSC Evaluation')
+    Assert-True ((Select-ImageEdition -Images $iot -Patterns $pat).ImageName -like '*IoT*') 'IoT LTSC'
+    $ent = & $img @('Windows 11 Enterprise Evaluation')
+    Assert-True ((Select-ImageEdition -Images $ent -Patterns $pat).ImageName -eq 'Windows 11 Enterprise Evaluation') 'Enterprise Evaluation'
+    $both = & $img @('Windows 11 Enterprise', 'Windows 11 IoT Enterprise LTSC')
+    Assert-True ((Select-ImageEdition -Images $both -Patterns $pat).ImageName -like '*IoT*') 'jarjestys: IoT LTSC ennen tavallista Enterprisea'
+    Assert-True ($null -eq (Select-ImageEdition -Images (& $img @('Windows 11 Home')) -Patterns $pat)) 'Home ei kelpaa oletuksilla (ei gpeditia)'
+}
+
 Test-Case 'Secure Boot 2023: kaynnistystiedostot vaihdetaan kuten Microsoftin skriptissa' {
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-ca2023-' + [guid]::NewGuid().ToString('N'))
     try {

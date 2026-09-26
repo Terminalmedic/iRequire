@@ -24,7 +24,7 @@
 param(
     [Parameter(Mandatory)][string]$IsoPath,
     [string]$WorkDir = (Join-Path $PSScriptRoot '..\Out'),
-    [string[]]$Edition = @('*IoT Enterprise LTSC*', '*Enterprise LTSC*', '*Pro'),
+    [string[]]$Edition = @('*IoT Enterprise LTSC*', '*Enterprise LTSC*', '*Pro', '*Enterprise*'),
     [string]$AdkRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\Assessment and Deployment Kit",
     [switch]$SkipLgpoDownload,
     [switch]$SkipNetFx3,
@@ -79,11 +79,8 @@ if (-not $src) { throw 'ISOsta ei loydy install.wim/.esd -tiedostoa' }
 
 $images = @(Get-WindowsImage -ImagePath $src)
 $images | ForEach-Object { Write-IRequireLog ("  indeksi {0}: {1}" -f $_.ImageIndex, $_.ImageName) }
-$chosen = $null
-foreach ($pattern in $Edition) {
-    $chosen = $images | Where-Object { $_.ImageName -like $pattern } | Select-Object -First 1
-    if ($chosen) { break }
-}
+. (Join-Path $repo 'Lib\Media.ps1')
+$chosen = Select-ImageEdition -Images $images -Patterns $Edition
 if (-not $chosen) { throw ('Yksikaan versio ei vastaa kuvioita: ' + ($Edition -join ', ')) }
 Write-IRequireLog ("Valittu: {0} (indeksi {1})" -f $chosen.ImageName, $chosen.ImageIndex) 'Ok'
 

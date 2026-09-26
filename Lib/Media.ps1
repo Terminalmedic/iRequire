@@ -152,3 +152,15 @@ function Get-IsoEfiBootImage {
     }
     throw "EFI-kaynnistyskuvaa ei loydy ($($names -join ', '))"
 }
+
+function Select-ImageEdition {
+    <# Ensimmainen kuvio, joka vastaa jotain kuvaa, voittaa (kuvioiden
+       jarjestys = mieltymys). '*Pro' ei vastaa "Pro N"- tai "Pro Education"
+       -versioita, koska kuvio loppuu sanaan Pro. #>
+    param([Parameter(Mandatory)]$Images, [Parameter(Mandatory)][string[]]$Patterns)
+    foreach ($pattern in $Patterns) {
+        $hit = @($Images | Where-Object { $_.ImageName -like $pattern }) | Select-Object -First 1
+        if ($hit) { return $hit }
+    }
+    return $null
+}
