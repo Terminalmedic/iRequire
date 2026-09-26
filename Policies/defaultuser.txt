@@ -1,0 +1,166 @@
+; ==============================================================
+;  iRequire: oletuskayttajan asetukset (ei kaytantoja)
+;
+;  Kirjoitetaan kuvan rakennusvaiheessa Default-kayttajan
+;  NTUSER.DAT:iin, joten jokainen uusi kayttaja saa ne heti.
+;  Samaa nelirivista muotoa kaytetaan kuin kaytantotiedostoissa,
+;  alue on aina User.
+; ==============================================================
+
+; --- Mainokset ja "vinkit" (ContentDeliveryManager) ---
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+ContentDeliveryAllowed
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+OemPreInstalledAppsEnabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+PreInstalledAppsEnabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SilentInstalledAppsEnabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SoftLandingEnabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SystemPaneSuggestionsEnabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SubscribedContent-338388Enabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SubscribedContent-338389Enabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SubscribedContent-353694Enabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SubscribedContent-353696Enabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager
+SubscribedContent-310093Enabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement
+ScoobeSystemSettingEnabled
+DWORD:0
+
+; --- Mainostunniste ja raataloidyt kokemukset ---
+User
+Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo
+Enabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\Privacy
+TailoredExperiencesWithDiagnosticDataEnabled
+DWORD:0
+
+User
+Software\Microsoft\Siuf\Rules
+NumberOfSIUFInPeriod
+DWORD:0
+
+; --- Haku ilman Bingia ---
+User
+Software\Microsoft\Windows\CurrentVersion\Search
+BingSearchEnabled
+DWORD:0
+
+; --- Tehtavapalkki: ei pienoisohjelmia, chattia eika tehtavanakymaa ---
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+TaskbarDa
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+TaskbarMn
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+ShowTaskViewButton
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+ShowCopilotButton
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+Start_IrisRecommendations
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+Start_AccountNotifications
+DWORD:0
+
+; --- Resurssienhallinta: tiedostopaatteet nakyviin ---
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+HideFileExt
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+LaunchTo
+DWORD:1
+
+; --- Pelitallennus pois (Game DVR) ---
+User
+System\GameConfigStore
+GameDVR_Enabled
+DWORD:0
+
+User
+Software\Microsoft\Windows\CurrentVersion\GameDVR
+AppCaptureEnabled
+DWORD:0
+
+; --- Hiiren kiihdytys pois (peleissa tarkempi) ---
+User
+Control Panel\Mouse
+MouseSpeed
+SZ:0
+
+User
+Control Panel\Mouse
+MouseThreshold1
+SZ:0
+
+User
+Control Panel\Mouse
+MouseThreshold2
+SZ:0
+
+; --- OneDriven automaattinen asennus uudelle kayttajalle pois (Pro-kuva) ---
+User
+Software\Microsoft\Windows\CurrentVersion\Run
+OneDriveSetup
+DELETE

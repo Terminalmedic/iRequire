@@ -1,0 +1,8 @@
+# Rakennuksen tulokset ja ladatut tiedostot
+Out/
+Tools/*.exe
+Build/Updates/*
+!Build/Updates/.gitkeep
+Build/Drivers/*
+!Build/Drivers/.gitkeep
+Reports/
