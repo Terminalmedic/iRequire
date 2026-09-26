@@ -199,8 +199,8 @@ function Invoke-ForEachUserHive {
         $loaded = $false
         if (-not (Test-Path -LiteralPath $root)) {
             if (-not $t.Hive -or -not (Test-Path -LiteralPath $t.Hive)) { continue }
-            & reg.exe load ('HKU\' + $t.Sid) $t.Hive 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { Write-IRequireLog ("Kayttajan {0} rekisteria ei voitu ladata" -f $t.Sid) 'Varoitus'; continue }
+            $r = Invoke-Native reg.exe @('load', ('HKU\' + $t.Sid), $t.Hive)
+            if ($r.ExitCode -ne 0) { Write-IRequireLog ("Kayttajan {0} rekisteria ei voitu ladata" -f $t.Sid) 'Varoitus'; continue }
             $loaded = $true
         }
         try {
@@ -209,10 +209,32 @@ function Invoke-ForEachUserHive {
             if ($loaded) {
                 [GC]::Collect()
                 [GC]::WaitForPendingFinalizers()
-                & reg.exe unload ('HKU\' + $t.Sid) 2>&1 | Out-Null
+                $r = Invoke-Native reg.exe @('unload', ('HKU\' + $t.Sid))
+                if ($r.ExitCode -ne 0) { Write-IRequireLog ("Kayttajan {0} rekisteria ei voitu irrottaa: {1}" -f $t.Sid, ($r.Output -join ' ')) 'Varoitus' }
             }
         }
     }
+}
+
+function Invoke-Native {
+    <# Ajaa ulkoisen ohjelman ja palauttaa tulosteen (stdout + stderr) ja
+       paluukoodin. Suora '& ohjelma 2>&1' on PowerShell 5.1:ssa vaarallinen:
+       kun ErrorActionPreference on Stop, jokainen stderr-rivi muuttuu
+       kaatavaksi virheeksi (NativeCommandError), vaikka ohjelma onnistuisi.
+       Esim. LGPO.exe kirjoittaa esittelytekstinsa stderriin. #>
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [string[]]$ArgumentList = @()
+    )
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $eap
+    }
+    return [pscustomobject]@{ ExitCode = $code; Output = $out }
 }
 
 function Test-InternetConnection {

@@ -37,9 +37,9 @@ function Invoke-Diskpart {
     param([Parameter(Mandatory)][string[]]$Commands, [Parameter(Mandatory)][string]$WorkDir)
     $script = Join-Path $WorkDir 'diskpart.txt'
     $Commands | Set-Content -LiteralPath $script -Encoding ASCII
-    $out = & diskpart.exe /s $script 2>&1
-    $out | ForEach-Object { Write-IRequireLog ("diskpart: " + $_) }
-    if ($LASTEXITCODE -ne 0) { throw "diskpart epaonnistui (koodi $LASTEXITCODE)" }
+    $r = Invoke-Native diskpart.exe @('/s', $script)
+    $r.Output | ForEach-Object { Write-IRequireLog ("diskpart: " + $_) }
+    if ($r.ExitCode -ne 0) { throw "diskpart epaonnistui (koodi $($r.ExitCode))" }
 }
 
 function New-WindowsPartitions {

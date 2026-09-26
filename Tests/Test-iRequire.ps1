@@ -54,6 +54,36 @@ Test-Case 'Kaikki .ps1-tiedostot jasentyvat' {
     }
 }
 
+Test-Case 'Ulkoinen ohjelma: stderr ei kaada, paluukoodi talteen (Invoke-Native)' {
+    # PowerShell 5.1 + Stop: '& ohjelma 2>&1' kaatuu ensimmaiseen stderr-riviin.
+    # Nain kavi LGPO.exe:lle oikeassa asennuksessa (paasta paahan -testi).
+    if ($env:OS -eq 'Windows_NT') { $exe = 'cmd.exe'; $argv = @('/c', 'echo tulos& echo virhe 1>&2& exit /b 3') }
+    else { $exe = 'sh'; $argv = @('-c', 'echo tulos; echo virhe >&2; exit 3') }
+    $ErrorActionPreference = 'Stop'
+    $r = Invoke-Native $exe $argv
+    Assert-True ($r.ExitCode -eq 3) "paluukoodi $($r.ExitCode), odotettiin 3"
+    $text = ($r.Output -join '|')
+    Assert-True ($text -match 'tulos' -and $text -match 'virhe') "tuloste: $text"
+    Assert-True ($ErrorActionPreference -eq 'Stop') 'ErrorActionPreference ei palautunut'
+    $r = Invoke-Native $exe $(if ($env:OS -eq 'Windows_NT') { @('/c', 'exit /b 0') } else { @('-c', 'exit 0') })
+    Assert-True ($r.ExitCode -eq 0) "onnistunut ajo: $($r.ExitCode)"
+}
+
+Test-Case 'Ulkoisia ohjelmia ei ajeta suoraan 2>&1:lla (vain Invoke-Native)' {
+    $bad = New-Object System.Collections.Generic.List[string]
+    foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.ps1 | Where-Object { $_.Name -ne 'Test-iRequire.ps1' })) {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
+        $merges = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.MergingRedirectionAst] }, $true)
+        foreach ($m in $merges) {
+            $p = $m.Parent
+            while ($p -and -not ($p -is [System.Management.Automation.Language.FunctionDefinitionAst])) { $p = $p.Parent }
+            if ($p -and $p.Name -eq 'Invoke-Native') { continue }
+            $bad.Add(('{0}:{1}' -f $f.Name, $m.Extent.StartLineNumber))
+        }
+    }
+    Assert-True ($bad.Count -eq 0) ('suora 2>&1: ' + ($bad -join ', '))
+}
+
 Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
     # Windows-cmdletit joita ei ole kaikilla alustoilla (esim. Linuxin pwsh).
     $windowsOnly = @(

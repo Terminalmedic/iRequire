@@ -77,9 +77,9 @@ function Invoke-StagePolicies {
     if (Test-Path -LiteralPath $lgpo) {
         foreach ($f in $files) {
             Write-IRequireLog "LGPO: $f"
-            $out = & $lgpo /t $f 2>&1
-            $out | ForEach-Object { Write-IRequireLog ("  " + $_) }
-            if ($LASTEXITCODE -ne 0) { throw "LGPO epaonnistui tiedostolle $f (koodi $LASTEXITCODE)" }
+            $r = Invoke-Native $lgpo @('/t', $f)
+            $r.Output | ForEach-Object { Write-IRequireLog ("  " + $_) }
+            if ($r.ExitCode -ne 0) { throw "LGPO epaonnistui tiedostolle $f (koodi $($r.ExitCode))" }
         }
     } else {
         # Varamenetelma: samat arvot suoraan rekisteriin. Toimii, mutta
@@ -94,7 +94,7 @@ function Invoke-StagePolicies {
             foreach ($e in $userEntries) { Set-PolicyEntry -Entry $e -Root $root }
         }
     }
-    & gpupdate.exe /force /wait:120 2>&1 | ForEach-Object { Write-IRequireLog ("gpupdate: " + $_) }
+    (Invoke-Native gpupdate.exe @('/force', '/wait:120')).Output | ForEach-Object { Write-IRequireLog ("gpupdate: " + $_) }
 }
 
 function Invoke-StageServices {
@@ -359,7 +359,10 @@ function Write-Summary {
 
 function Invoke-StageFinish {
     param($State)
-    try { Update-MpSignature -ErrorAction Stop; Write-IRequireLog 'Defenderin maaritykset paivitetty' } catch { }
+    Write-IRequireLog 'Paivitetaan Defenderin maaritykset'
+    try { Update-MpSignature -ErrorAction Stop; Write-IRequireLog 'Defenderin maaritykset paivitetty' } catch {
+        Write-IRequireLog ('Defenderin maaritysten paivitys epaonnistui: ' + $_.Exception.Message) 'Varoitus'
+    }
 
     Write-IRequireLog 'Siivotaan komponenttivarasto (vapauttaa levytilaa)'
     & dism.exe /Online /Cleanup-Image /StartComponentCleanup /Quiet | Out-Null

@@ -100,12 +100,18 @@ while kill -0 "$QEMU_PID" 2>/dev/null; do
     sleep 1; if [ -f "$f.ppm" ]; then pnmtopng "$f.ppm" > "$f.png" 2>/dev/null || true; fi; rm -f "$f.ppm"
     old="$WORK/shots/s$(printf %04d $((shot - 8))).png"
     [ $(( (shot - 8) % 4 )) -ne 0 ] && rm -f "$old"
-    # Jumin tunnistus: jos kumpikaan levy ei muutu $STALL_MIN minuuttiin,
-    # kone odottaa jotain (virheilmoitus, nappainta) - ei kannata odottaa tunteja.
+    # Jumin tunnistus: jos kone ei $STALL_MIN minuuttiin kirjoita sarjaporttiin
+    # eika levykuva kasva, se odottaa jotain (virheilmoitus, nappainta).
+    # Pelkka levykuvan koko ei riita: se kasvaa vain kun uusia lohkoja
+    # varataan (ja TRIM jopa pienentaa sita), joten tyossa oleva kone
+    # naytti jumittuneelta.
     size=$(( $(stat -c %s nvme.qcow2) + $(stat -c %s sata.qcow2) ))
-    if [ "$size" -ne "$last_size" ]; then last_size=$size; last_change=$(date +%s); fi
+    serial=$(stat -c %s out/serial.log 2>/dev/null || echo 0)
+    if [ "$size" -ne "$last_size" ] || [ "$serial" -ne "${last_serial:-0}" ]; then
+        last_size=$size; last_serial=$serial; last_change=$(date +%s)
+    fi
     if [ $(( $(date +%s) - last_change )) -gt $(( STALL_MIN * 60 )) ]; then
-        log "JUMISSA: levyt eivat ole muuttuneet $STALL_MIN minuuttiin"
+        log "JUMISSA: ei sarjaporttilokia eika levymuutoksia $STALL_MIN minuuttiin"
         echo "quit" | socat - "unix-connect:mon.sock" >/dev/null 2>&1 || kill "$QEMU_PID" || true
         wait "$QEMU_PID" || true
         echo "STALL" > out/tulos.txt

@@ -223,24 +223,24 @@ function Get-OfflineWindowsInfo {
     $mount = 'HKLM\iRequireInfo'
     $info = 'tunnistamaton versio'
     try {
-        & reg.exe load $mount (Join-Path $Root 'Windows\System32\config\SOFTWARE') 2>&1 | Out-Null
+        Invoke-Native reg.exe @('load', $mount, (Join-Path $Root 'Windows\System32\config\SOFTWARE')) | Out-Null
         $cv = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\iRequireInfo\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop
         $info = '{0} (koontiversio {1})' -f $cv.ProductName, $cv.CurrentBuild
         $cv = $null
     } catch {
     } finally {
         [GC]::Collect()
-        & reg.exe unload $mount 2>&1 | Out-Null
+        Invoke-Native reg.exe @('unload', $mount) | Out-Null
     }
     try {
-        & reg.exe load $mount (Join-Path $Root 'Windows\System32\config\SYSTEM') 2>&1 | Out-Null
+        Invoke-Native reg.exe @('load', $mount, (Join-Path $Root 'Windows\System32\config\SYSTEM')) | Out-Null
         $cn = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\iRequireInfo\ControlSet001\Control\ComputerName\ComputerName' -ErrorAction Stop
         if ($cn.ComputerName) { $info += ', koneen nimi ' + $cn.ComputerName }
         $cn = $null
     } catch {
     } finally {
         [GC]::Collect()
-        & reg.exe unload $mount 2>&1 | Out-Null
+        Invoke-Native reg.exe @('unload', $mount) | Out-Null
     }
     return $info
 }

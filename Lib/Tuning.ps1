@@ -76,8 +76,7 @@ function Set-PowerPlan {
         $Choice = 'High'
     }
     if ($Choice -eq 'High') {
-        & powercfg.exe /setactive $script:PowerPlans.High 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) { Write-IRequireLog 'Virrankaytto: High performance' 'Ok'; return }
+        if ((Invoke-Native powercfg.exe @('/setactive', $script:PowerPlans.High)).ExitCode -eq 0) { Write-IRequireLog 'Virrankaytto: High performance' 'Ok'; return }
         Write-IRequireLog 'High performance ei kaytettavissa, kaytetaan Balanced + paras suorituskyky' 'Varoitus'
     }
 
