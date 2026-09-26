@@ -119,6 +119,7 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 | Oire | Syy ja korjaus |
 |---|---|
 | "Sisäisiä levyjä ei löytynyt" | Intel RST/VMD-ohjaimen ajuri puuttuu WinPE:stä. Lisää se kansioon `Build\Drivers\WinPE` ja rakenna uudelleen, tai vaihda BIOSista SATA-tilaksi AHCI. |
+| Sisäinen levy näkyy listalla "Ei kosketa (irrotettava levy)" | SATA-portin hot-plug on päällä, joten Windows pitää levyä irrotettavana. iRequire ei tyhjennä irrotettavia levyjä, koska se voisi olla esimerkiksi varmuuskopiolevy. Kytke hot-plug pois BIOSista kyseiseltä portilta. |
 | "Tikun tiedostot ovat vioittuneet" | Kirjoita tikku uudelleen, tai kokeile toista tikkua. |
 | Levy hylätään, eikä sitä voi lukea eikä kirjoittaa | Laitteistosalattu, lukittu levy (Opal/eDrive). Palauta se valmistajan PSID-toiminnolla. |
 | Secure Boot -virhe tikulta käynnistettäessä | Laiteohjelmisto on hylännyt vanhan varmenteen. Rakenna media uudemmasta ISOsta, tai kytke Secure Boot pois asennuksen ajaksi. |
