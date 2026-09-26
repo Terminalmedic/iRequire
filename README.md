@@ -111,6 +111,8 @@ Periaate: vain muutoksia, joiden hyöty on mitattu tai Microsoftin dokumentoima.
 - AutoRun pois (USB-haittaohjelmat)
 - SMB1 pois
 - Etätuki pois
+- Haavoittuvien ajurien estolista pakotettu päälle
+- Microsoftin "Standard protection" -ASR-säännöt: haavoittuvien ajurien väärinkäyttö, tunnusten varkaus lsassista ja WMI-pysyvyys estetty
 - Automaattinen laitesalaus estetty, koska sen avain katoaisi paikallisella tilillä. BitLocker on valittavissa asetuksella `Tietoturva.BitLocker`, jolloin avain tallennetaan tikulle.
 
 Testit estävät, ettei mikään näistä kytkeydy vahingossa pois.

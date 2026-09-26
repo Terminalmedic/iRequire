@@ -580,6 +580,11 @@ Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScree
         $hit = @($all | Where-Object { $_.Name -eq $f.Name -and (-not $f.Value -or $_.Value -eq $f.Value) })
         Assert-True ($hit.Count -eq 0) ("Kielletty asetus: {0}" -f $f.Name)
     }
+    $blocklist = @($all | Where-Object { $_.Name -eq 'VulnerableDriverBlocklistEnable' })
+    Assert-True ($blocklist.Count -eq 1 -and $blocklist[0].Value -eq '1') 'Haavoittuvien ajurien estolista ei ole pakotettu paalle'
+    $asr = @($all | Where-Object { $_.Key -like '*Exploit Guard\ASR\Rules' })
+    Assert-True ($asr.Count -ge 3 -and @($asr | Where-Object { $_.Value -ne '1' }).Count -eq 0) 'ASR-saannot eivat ole estotilassa (1)'
+    foreach ($r in $asr) { Assert-True ($r.Name -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') "ASR-tunniste vaaraa muotoa: $($r.Name)" }
     $d = Get-Content -LiteralPath (Join-Path $root 'Policies\Debloat.json') -Raw | ConvertFrom-Json
     foreach ($svc in @('WinDefend', 'mpssvc', 'SecurityHealthService', 'wscsvc', 'Sense', 'WdNisSvc')) {
         Assert-True ($d.Palvelut -notcontains $svc) "Tietoturvapalvelu $svc poistolistalla"
@@ -644,6 +649,13 @@ Test-Case 'Pelikunto: kunnossa oleva kone ei saa aiheettomia varoituksia' {
     foreach ($dgpu in @('NVIDIA GeForce GTX 1060 6GB', 'AMD Radeon RX 6600', 'AMD Radeon R9 290', 'NVIDIA RTX A2000')) {
         Assert-True (Test-DiscreteGpuName $dgpu) "$dgpu ei tunnistettu erilliseksi"
     }
+}
+
+Test-Case 'Pelikunto: WMI:n erikoisarvot (0/1 Hz) eivat ole taajuuksia' {
+    # Loytyi oikealla Windowsilla: Hyper-V-naytto ilmoitti 1 Hz / 64 Hz.
+    $gpus = @([pscustomobject]@{ Name = 'Microsoft Hyper-V Video'; Active = $true; CurrentHz = 1; MaxHz = 64; Basic = $false })
+    $f = Get-GamingFindings -Gpus $gpus -HasBattery $false
+    Assert-True (@($f.ToArray() | Where-Object { $_.Teksti -match 'Hz' }).Count -eq 0) 'Erikoisarvosta tehtiin taajuushavainto'
 }
 
 Test-Case 'Pelikunto: kannettavan Optimus-kytkenta ei ole virhe' {

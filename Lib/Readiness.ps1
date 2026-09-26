@@ -74,7 +74,9 @@ function Get-GamingFindings {
             $f.Add((New-Finding 'Toimi' ("Naytto on kytketty emolevyn liitantaan, joten pelit pyorivat integroidulla grafiikalla eika {0}:lla. Kytke naytto naytonohjaimen liitantaan." -f $discrete[0].Name)))
         }
     }
-    foreach ($g in @($gpu | Where-Object { $_.Active -and $_.CurrentHz -gt 0 -and $_.MaxHz -gt 0 })) {
+    # WMI:n CurrentRefreshRate 0 ja 1 ovat erikoisarvoja (oletus / optimaalinen),
+    # eivat taajuuksia. Alle 24 Hz ei ole todellinen pelinaytto.
+    foreach ($g in @($gpu | Where-Object { $_.Active -and $_.CurrentHz -ge 24 -and $_.MaxHz -ge 24 })) {
         if ($g.CurrentHz -lt $g.MaxHz) {
             $f.Add((New-Finding 'Huomio' ("Naytto ({0}) toimii {1} Hz, suurin tuettu {2} Hz. iRequire nostaa taajuuden kirjautumisen yhteydessa; tarkista myos kaapeli (HDMI 1.4 rajoittaa)." -f $g.Name, $g.CurrentHz, $g.MaxHz)))
         } else {

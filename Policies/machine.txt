@@ -385,3 +385,38 @@ Computer
 SOFTWARE\Policies\Microsoft\Windows Defender\Scan
 LowCpuPriority
 DWORD:1
+
+; --- Haavoittuvien ajurien estolista: haittaohjelmat ja huijausohjelmat
+;     kayttavat tunnetusti haavoittuvia allekirjoitettuja ajureita ytimeen
+;     paasyyn. Oletuksena paalla Windows 11:ssa; pakotetaan ettei mikaan
+;     tyokalu kytke sita pois. ---
+Computer
+SYSTEM\CurrentControlSet\Control\CI\Config
+VulnerableDriverBlocklistEnable
+DWORD:1
+
+; --- Defenderin ASR-saannot, Microsoftin "Standard protection" -joukko
+;     jota Microsoft suosittelee kaikille koneille: ei yhteensopivuus-
+;     eika suorituskykyhaittaa pelikoneessa. ---
+Computer
+SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR
+ExploitGuard_ASR_Rules
+DWORD:1
+
+; Estaa haavoittuvien allekirjoitettujen ajurien vaarinkayton
+Computer
+SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules
+56a863a9-875e-4185-98a7-b882c64b5ce5
+SZ:1
+
+; Estaa tunnusten varastamisen lsass.exe:sta
+Computer
+SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules
+9e6c4e1f-7d60-472f-ba1a-a39ef669e4b2
+SZ:1
+
+; Estaa pysyvyyden WMI-tapahtumatilausten kautta
+Computer
+SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules
+e6db77e5-3df2-4cf1-b95a-636979351e5b
+SZ:1
