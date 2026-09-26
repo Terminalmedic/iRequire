@@ -372,6 +372,23 @@ function Write-Summary {
     Write-IRequireLog "Yhteenveto: $path" 'Ok'
 }
 
+function Add-SummaryShortcut {
+    <# Yhteenveto (pelikuntoraportti) kaikkien kayttajien tyopoydalle.
+       Pikakuvake eika kopio: naytot lisataan yhteenvetoon myohemmin. #>
+    $target = Join-Path $base 'Reports\yhteenveto.txt'
+    $desktop = Join-Path $env:PUBLIC 'Desktop'
+    try {
+        $shell = New-Object -ComObject WScript.Shell
+        $lnk = $shell.CreateShortcut((Join-Path $desktop 'iRequire - yhteenveto.lnk'))
+        $lnk.TargetPath = $target
+        $lnk.Description = 'Pelikuntoraportti ja tietoturvan tila'
+        $lnk.Save()
+        Write-IRequireLog 'Yhteenveto tyopoydalle' 'Ok'
+    } catch {
+        Write-IRequireLog ('Tyopoydan pikakuvake epaonnistui: ' + $_.Exception.Message) 'Varoitus'
+    }
+}
+
 function Invoke-StageFinish {
     param($State)
     Write-IRequireLog 'Paivitetaan Defenderin maaritykset'
@@ -399,6 +416,7 @@ function Invoke-StageFinish {
     # oletuksena paalle, joten ajetaan uudelleen.
     Disable-NetBios
     Write-Summary -State $State
+    Add-SummaryShortcut
     Remove-Item -LiteralPath (Join-Path $base 'ASENNUS-KESKEN.tag') -Force -ErrorAction SilentlyContinue
 
     # Kirjoitussuojattu tikku (tai ISO) ei saa kaataa viimeistelya.

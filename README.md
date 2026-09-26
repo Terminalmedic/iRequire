@@ -46,7 +46,7 @@ Halutessasi muokkaa tikulla `iRequire\Config\iRequire.json` (käyttäjänimi, WL
 
 **5. Oikea ajo:** aseta `"Harjoitus": false`, **irrota levyt, joita et halua tyhjentää** (oletuksena kaikki sisäiset levyt tyhjennetään), ja käynnistä tikulta. Laskurin aikana Esc peruu kaiken. Sen jälkeen koneeseen ei tarvitse koskea: se käynnistyy useita kertoja itsestään.
 
-**6. Valmis:** lue `C:\iRequire\Reports\yhteenveto.txt` (kopio myös tikulla). Pelikuntoraportti kertoo, mitä vielä kannattaa tehdä, esim. näytönohjaimen valmistajan ajuri ja XMP BIOSista. Jos jokin pysähtyy, katso [Vianetsintä](#vianetsintä).
+**6. Valmis:** avaa työpöydältä *iRequire - yhteenveto* (`C:\iRequire\Reports\yhteenveto.txt`, kopio myös tikulla). Pelikuntoraportti kertoo, mitä vielä kannattaa tehdä, esim. näytönohjaimen valmistajan ajuri ja XMP BIOSista. Jos jokin pysähtyy, katso [Vianetsintä](#vianetsintä).
 
 Kehittäjälle: `.\Tests\Invoke-Checks.ps1` ajaa kaikki tarkistukset, ja [Testaus](#testaus) kertoo, miten koko ketju testataan virtuaalikoneessa.
 
