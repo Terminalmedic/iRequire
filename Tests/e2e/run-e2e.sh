@@ -17,7 +17,7 @@ set -euo pipefail
 
 ISO_IN="$1"
 WORK="$2"
-TIMEOUT_MIN="${E2E_TIMEOUT_MIN:-210}"
+TIMEOUT_MIN="${E2E_TIMEOUT_MIN:-150}"
 SECRET="IREQUIRE-SALAINEN-TESTIDATA-7f3a9c"
 
 mkdir -p "$WORK/shots" "$WORK/out"
@@ -91,7 +91,12 @@ while kill -0 "$QEMU_PID" 2>/dev/null; do
         fi
     fi
     # Kuvakaappaus puolen minuutin valein: jos jokin jumittuu, nakyy mihin.
-    echo "screendump $WORK/shots/s$(printf %04d $shot).ppm" | socat - "unix-connect:mon.sock" >/dev/null 2>&1 || true
+    f="$WORK/shots/s$(printf %04d $shot)"
+    echo "screendump $f.ppm" | socat - "unix-connect:mon.sock" >/dev/null 2>&1 || true
+    # Heti PNG:ksi, jotta perutustakin ajosta jaa kuvat. Vanhat harvennetaan.
+    sleep 1; if [ -f "$f.ppm" ]; then pnmtopng "$f.ppm" > "$f.png" 2>/dev/null || true; fi; rm -f "$f.ppm"
+    old="$WORK/shots/s$(printf %04d $((shot - 8))).png"
+    [ $(( (shot - 8) % 4 )) -ne 0 ] && rm -f "$old"
     if [ "$(date +%s)" -gt "$deadline" ]; then
         log "AIKARAJA: kone ei sammunut itse $TIMEOUT_MIN minuutissa"
         echo "quit" | socat - "unix-connect:mon.sock" >/dev/null 2>&1 || kill "$QEMU_PID" || true
@@ -102,14 +107,6 @@ while kill -0 "$QEMU_PID" 2>/dev/null; do
 done
 wait "$QEMU_PID" 2>/dev/null || true
 log "Virtuaalikone pysahtyi"
-
-# Kuvakaappaukset PNG:ksi (vain joka neljas ja viimeiset, jottei artefakti paisu).
-for f in shots/*.ppm; do
-    [ -e "$f" ] || continue
-    n=$(basename "$f" .ppm | tr -dc 0-9); n=$((10#$n))
-    if [ $((n % 4)) -eq 0 ] || [ "$n" -gt $((shot - 6)) ]; then pnmtopng "$f" > "${f%.ppm}.png" 2>/dev/null || true; fi
-    rm -f "$f"
-done
 
 # --- 4. Tarkistus ulkopuolelta --------------------------------
 # Jokainen tarkistus on sellainen, ettei lukuvirhe voi naytta lapaisylta:

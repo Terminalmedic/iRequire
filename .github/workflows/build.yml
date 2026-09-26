@@ -113,7 +113,7 @@ jobs:
     name: Paasta paahan (QEMU/KVM, koko ketju ilman ihmista)
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 260
+    timeout-minutes: 200
     steps:
       - uses: actions/checkout@v4
 
