@@ -279,5 +279,6 @@ PostInstall/  Asennetussa Windowsissa ajettava vaihe
 Policies/     Ryhmäkäytännöt, oletuskäyttäjän asetukset, poistolista
 Lib/          Yhteiset funktiot: loki, asetukset, eheys, tilakone
 Config/       Asetukset
-Tests/        Tarkistukset ja Hyper-V-testikone
+Tools/        Kohdekoneen esitarkistus (kulkee tikulla: iRequire\Tools)
+Tests/        Tarkistukset, Hyper-V-testikone ja QEMU/KVM-paasta paahan -testi
 ```

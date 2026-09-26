@@ -19,6 +19,7 @@ Tikku joka tyhjentaa koneen levyt ja asentaa viritetyn Windows 11 IoT Enterprise
 - `Lib/` yhteiset: Common, Media (eheys), Stages (tilakone), Tuning, Readiness, Display
 - `Policies/` LGPO-tekstimuoto (4 rivia/tietue) + Debloat.json
 - `Build/` rakennus (vaatii Windows ADK + WinPE)
+- `Tools/` kulkee tikulla: Test-TargetMachine (esitarkistus kohdekoneen Windowsissa, ei muuta konetta)
 
 Puhdas paatoslogiikka erotetaan Windows-kutsuista (`Get-*Choice`, `Select-*`, `Get-GamingFindings`, `Test-WipeResult`, `Invoke-StageMachine`), jotta sen voi testata kaikkialla.
 
