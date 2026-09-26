@@ -110,7 +110,9 @@ Check 'Asennuskuva: .NET 3.5, SMB1 pois, oletuskayttajan asetukset' {
     Mount-WindowsImage -ImagePath $image -Index 1 -Path $m -ReadOnly | Out-Null
     try {
         $netfx = Get-WindowsOptionalFeature -Path $m -FeatureName NetFx3
-        Assert-True ($netfx.State -eq 'Enabled') ".NET 3.5: $($netfx.State)"
+        # Offline-kuvassa tila on EnablePending: viimeistely tapahtuu Windowsin
+        # ensimmaisella kaynnistyksella. Paasta paahan -testi tarkistaa lopputilan.
+        Assert-True ($netfx.State -in @('Enabled', 'EnablePending')) ".NET 3.5: $($netfx.State)"
         $smb = Get-WindowsOptionalFeature -Path $m -FeatureName SMB1Protocol -ErrorAction SilentlyContinue
         Assert-True (-not $smb -or $smb.State -ne 'Enabled') 'SMB1 on paalla'
 

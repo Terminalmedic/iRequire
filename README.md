@@ -218,7 +218,7 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 
 ## Testaus
 
-Kolme tasoa. Kaksi ensimmäistä ajetaan automaattisesti oikealla Windowsilla (GitHub Actions, Windows PowerShell 5.1, sama kuin WinPE:ssä):
+Neljä tasoa. Kolme ensimmäistä ajetaan automaattisesti GitHub Actionsissa, oikealla Windowsilla (Windows PowerShell 5.1, sama kuin WinPE:ssä) tai virtuaalikoneessa:
 
 **1. `Tests\Test-iRequire.ps1`: jokaisella commitilla.** Noin 50 tarkistusta:
 - **Tyhjennys päästä päähän:** levy korvataan testitiedostolla, jolle ajetaan HDD-ylikirjoitus, NVMe:n kryptografinen tyhjennys, "valehteleva" SSD, tukematon komento ja simuloitu viallinen sektori. Todistus kirjoitetaan.
@@ -241,7 +241,15 @@ Kolme tasoa. Kaksi ensimmäistä ajetaan automaattisesti oikealla Windowsilla (G
   - asennuskuva: .NET 3.5, SMB1, oletuskäyttäjän asetukset ja poistetut sovellukset
   - eheysmanifesti
 
-**3. Virtuaalikone ja harjoitustila: sinä, ennen oikeaa konetta.** CI ei voi käynnistää WinPE:tä, joten [ensimmäinen kerta](#ensimmäinen-kerta-näin-varmistat-että-se-toimii) ajetaan Hyper-V:ssä (`Tests\New-TestVm.ps1`) ja sen jälkeen harjoitustilassa oikealla koneella.
+**3. Päästä päähän -testi virtuaalikoneessa: automaattisesti rakennuksen perään.** Rakennettu ISO käynnistetään QEMU/KVM-virtuaalikoneessa. Koneessa on UEFI sekä NVMe- ja SATA-levy, joille on kirjoitettu tunnistettavaa "salaista" dataa. Koko ketju ajetaan ilman ihmistä: WinPE, eheystarkistus, laskuri, tyhjennys, asennus, Windowsin ensikäynnistys ja jälkiasennus. Kun Windows sammuttaa itsensä, levyt tutkitaan ulkopuolelta:
+- salaista dataa ei löydy kummaltakaan levyltä
+- tyhjennystodistus hyväksyy molemmat levyt
+- jälkiasennus on valmis
+- salasanat on poistettu
+
+Kuvakaappaukset puolen minuutin välein tallentuvat artefaktiksi. Ajuri: `Tests/e2e/run-e2e.sh`.
+
+**4. Harjoitustila oikealla koneella: sinä, ennen ensimmäistä oikeaa ajoa.** Virtuaalikone ei kerro, tunnistaako WinPE juuri sinun koneesi levyohjaimen. Harjoitustila kertoo, ks. [ensimmäinen kerta](#ensimmäinen-kerta-näin-varmistat-että-se-toimii).
 
 ## Rakenne
 

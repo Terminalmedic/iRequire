@@ -243,6 +243,10 @@ function Get-SecuritySummary {
         $lines.Add(('BitLocker: {0}' -f $bl.VolumeStatus))
     } catch { }
     try {
+        $nf = Get-WindowsOptionalFeature -Online -FeatureName NetFx3 -ErrorAction Stop
+        $lines.Add(('.NET Framework 3.5: {0}' -f $nf.State))
+    } catch { }
+    try {
         $plan = ((& powercfg.exe /getactivescheme) -join ' ') -replace '^.*\((.*)\).*$', '$1'
         $lines.Add("Virrankaytto: $plan")
     } catch { }
