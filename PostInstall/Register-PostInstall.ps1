@@ -10,6 +10,11 @@
 #>
 $ErrorActionPreference = 'Stop'
 $base = Join-Path $env:SystemDrive 'iRequire'
+
+# Asetuksissa on kayttajan ja WLANin salasana selvakielisena. Vain
+# SYSTEM ja jarjestelmanvalvojat saavat lukea niita; tiedosto poistetaan
+# kokonaan kun jalkiasennus valmistuu.
+& icacls.exe (Join-Path $base 'Config') /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
 $action = New-ScheduledTaskAction -Execute $ps `

@@ -51,7 +51,7 @@ function Invoke-Checked {
 }
 
 # --------------------------------------------------------------
-Write-Log '1/8 Kopioidaan ISO'
+Write-IRequireLog '1/8 Kopioidaan ISO'
 # --------------------------------------------------------------
 $iso = Mount-DiskImage -ImagePath (Resolve-Path $IsoPath).Path -PassThru
 try {
@@ -64,21 +64,21 @@ try {
 Get-ChildItem -LiteralPath $media -Recurse -File | ForEach-Object { $_.IsReadOnly = $false }
 
 # --------------------------------------------------------------
-Write-Log '2/8 Valitaan versio'
+Write-IRequireLog '2/8 Valitaan versio'
 # --------------------------------------------------------------
 $src = @('install.wim', 'install.esd') | ForEach-Object { Join-Path $media "sources\$_" } |
     Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 if (-not $src) { throw 'ISOsta ei loydy install.wim/.esd -tiedostoa' }
 
 $images = @(Get-WindowsImage -ImagePath $src)
-$images | ForEach-Object { Write-Log ("  indeksi {0}: {1}" -f $_.ImageIndex, $_.ImageName) }
+$images | ForEach-Object { Write-IRequireLog ("  indeksi {0}: {1}" -f $_.ImageIndex, $_.ImageName) }
 $chosen = $null
 foreach ($pattern in $Edition) {
     $chosen = $images | Where-Object { $_.ImageName -like $pattern } | Select-Object -First 1
     if ($chosen) { break }
 }
 if (-not $chosen) { throw ('Yksikaan versio ei vastaa kuvioita: ' + ($Edition -join ', ')) }
-Write-Log ("Valittu: {0} (indeksi {1})" -f $chosen.ImageName, $chosen.ImageIndex) 'Ok'
+Write-IRequireLog ("Valittu: {0} (indeksi {1})" -f $chosen.ImageName, $chosen.ImageIndex) 'Ok'
 
 $wim = Join-Path $tmp 'install.wim'
 if (Test-Path -LiteralPath $wim) { Remove-Item -LiteralPath $wim -Force }
@@ -86,7 +86,7 @@ Export-WindowsImage -SourceImagePath $src -SourceIndex $chosen.ImageIndex -Desti
 Remove-Item -LiteralPath $src -Force
 
 # --------------------------------------------------------------
-Write-Log '3/8 Muokataan asennuskuvaa'
+Write-IRequireLog '3/8 Muokataan asennuskuvaa'
 # --------------------------------------------------------------
 Mount-WindowsImage -ImagePath $wim -Index 1 -Path $mount | Out-Null
 $saved = $false
@@ -94,40 +94,40 @@ try {
     $updates = @(Get-ChildItem -LiteralPath (Join-Path $repo 'Build\Updates') -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Extension -in '.msu', '.cab' } | Sort-Object Name)
     foreach ($u in $updates) {
-        Write-Log "  paivitys: $($u.Name)"
+        Write-IRequireLog "  paivitys: $($u.Name)"
         Add-WindowsPackage -Path $mount -PackagePath $u.FullName | Out-Null
     }
 
     $drivers = Join-Path $repo 'Build\Drivers'
     if (Get-ChildItem -LiteralPath $drivers -Recurse -Filter *.inf -ErrorAction SilentlyContinue | Select-Object -First 1) {
-        Write-Log '  ajurit: Build\Drivers'
+        Write-IRequireLog '  ajurit: Build\Drivers'
         Add-WindowsDriver -Path $mount -Driver $drivers -Recurse | Out-Null
     }
 
     $prov = @(Get-AppxProvisionedPackage -Path $mount)
     foreach ($pattern in $debloat.Appx) {
         foreach ($p in @($prov | Where-Object { $_.DisplayName -like $pattern })) {
-            Write-Log "  poistetaan: $($p.DisplayName)"
+            Write-IRequireLog "  poistetaan: $($p.DisplayName)"
             Remove-AppxProvisionedPackage -Path $mount -PackageName $p.PackageName | Out-Null
         }
     }
     $caps = @(Get-WindowsCapability -Path $mount | Where-Object { $_.State -eq 'Installed' })
     foreach ($pattern in $debloat.Kyvyt) {
         foreach ($c in @($caps | Where-Object { $_.Name -like $pattern })) {
-            Write-Log "  poistetaan ominaisuus: $($c.Name)"
+            Write-IRequireLog "  poistetaan ominaisuus: $($c.Name)"
             try { Remove-WindowsCapability -Path $mount -Name $c.Name | Out-Null }
-            catch { Write-Log ("  {0}: {1}" -f $c.Name, $_.Exception.Message) 'Varoitus' }
+            catch { Write-IRequireLog ("  {0}: {1}" -f $c.Name, $_.Exception.Message) 'Varoitus' }
         }
     }
     foreach ($f in $debloat.Ominaisuudet) {
         $feat = Get-WindowsOptionalFeature -Path $mount -FeatureName $f -ErrorAction SilentlyContinue
         if ($feat -and $feat.State -eq 'Enabled') {
-            Write-Log "  pois kaytosta: $f"
+            Write-IRequireLog "  pois kaytosta: $f"
             Disable-WindowsOptionalFeature -Path $mount -FeatureName $f | Out-Null
         }
     }
 
-    Write-Log '  oletuskayttajan asetukset'
+    Write-IRequireLog '  oletuskayttajan asetukset'
     $hive = 'HKU\iRequireDefault'
     Invoke-Checked reg.exe @('load', $hive, (Join-Path $mount 'Users\Default\NTUSER.DAT'))
     try {
@@ -141,7 +141,7 @@ try {
     }
 
     if ($updates.Count -gt 0) {
-        Write-Log '  siivotaan korvautuneet komponentit'
+        Write-IRequireLog '  siivotaan korvautuneet komponentit'
         Invoke-Checked dism.exe @("/Image:$mount", '/Cleanup-Image', '/StartComponentCleanup', '/ResetBase')
     }
     Dismount-WindowsImage -Path $mount -Save | Out-Null
@@ -151,7 +151,7 @@ try {
 }
 
 # --------------------------------------------------------------
-Write-Log '4/8 Pakataan ja pilkotaan asennuskuva'
+Write-IRequireLog '4/8 Pakataan ja pilkotaan asennuskuva'
 # --------------------------------------------------------------
 $final = Join-Path $tmp 'install-final.wim'
 if (Test-Path -LiteralPath $final) { Remove-Item -LiteralPath $final -Force }
@@ -166,7 +166,7 @@ if ((Get-Item -LiteralPath $final).Length -gt 3.9GB) {
 }
 
 # --------------------------------------------------------------
-Write-Log '5/8 Muokataan kaynnistyskuvaa (boot.wim)'
+Write-IRequireLog '5/8 Muokataan kaynnistyskuvaa (boot.wim)'
 # --------------------------------------------------------------
 $ocRoot = Join-Path $AdkRoot 'Windows Preinstallation Environment\amd64\WinPE_OCs'
 if (-not (Test-Path -LiteralPath $ocRoot)) { throw "WinPE-lisaosaa ei loydy: $ocRoot. Asenna Windows ADK + WinPE add-on." }
@@ -182,7 +182,7 @@ try {
                       'WinPE-StorageWMI', 'WinPE-DismCmdlets')) {
         $cab = Join-Path $ocRoot "$oc.cab"
         if (-not (Test-Path -LiteralPath $cab)) { throw "Puuttuu: $cab" }
-        Write-Log "  $oc"
+        Write-IRequireLog "  $oc"
         Add-WindowsPackage -Path $mount -PackagePath $cab | Out-Null
         $langCab = Join-Path $ocRoot "$lang\${oc}_$lang.cab"
         if (Test-Path -LiteralPath $langCab) { Add-WindowsPackage -Path $mount -PackagePath $langCab | Out-Null }
@@ -190,7 +190,7 @@ try {
 
     $peDrivers = Join-Path $repo 'Build\Drivers\WinPE'
     if (Get-ChildItem -LiteralPath $peDrivers -Recurse -Filter *.inf -ErrorAction SilentlyContinue | Select-Object -First 1) {
-        Write-Log '  WinPE-ajurit: Build\Drivers\WinPE'
+        Write-IRequireLog '  WinPE-ajurit: Build\Drivers\WinPE'
         Add-WindowsDriver -Path $mount -Driver $peDrivers -Recurse | Out-Null
     }
 
@@ -210,7 +210,7 @@ Export-WindowsImage -SourceImagePath $bootWim -SourceIndex 2 -DestinationImagePa
 Move-Item -LiteralPath $bootNew -Destination $bootWim -Force
 
 # --------------------------------------------------------------
-Write-Log '6/8 LGPO.exe (Microsoft Security Compliance Toolkit)'
+Write-IRequireLog '6/8 LGPO.exe (Microsoft Security Compliance Toolkit)'
 # --------------------------------------------------------------
 $tools = Join-Path $repo 'Tools'
 New-Item -ItemType Directory -Path $tools -Force | Out-Null
@@ -227,14 +227,14 @@ if (-not (Test-Path -LiteralPath $lgpo) -and -not $SkipLgpoDownload) {
             throw "allekirjoitus ei kelpaa ($($sig.Status))"
         }
         Copy-Item -LiteralPath $exe.FullName -Destination $lgpo -Force
-        Write-Log 'LGPO.exe haettu ja allekirjoitus tarkistettu' 'Ok'
+        Write-IRequireLog 'LGPO.exe haettu ja allekirjoitus tarkistettu' 'Ok'
     } catch {
-        Write-Log ('LGPO.exe:n haku epaonnistui, kaytetaan varamenetelmaa: ' + $_.Exception.Message) 'Varoitus'
+        Write-IRequireLog ('LGPO.exe:n haku epaonnistui, kaytetaan varamenetelmaa: ' + $_.Exception.Message) 'Varoitus'
     }
 }
 
 # --------------------------------------------------------------
-Write-Log '7/8 Kopioidaan iRequire-skriptit mediaan'
+Write-IRequireLog '7/8 Kopioidaan iRequire-skriptit mediaan'
 # --------------------------------------------------------------
 $payload = Join-Path $media 'iRequire'
 New-Item -ItemType Directory -Path $payload -Force | Out-Null
@@ -252,10 +252,17 @@ foreach ($f in @('autounattend.xml', 'sources\ei.cfg')) {
     if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
 }
 
+# Tiivisteet viimeisena, kun mediaan ei enaa tule muutoksia. WinPE
+# tarkistaa ne ennen kuin koskee koneen levyihin.
+. (Join-Path $repo 'Lib\Media.ps1')
+Write-IRequireLog '  lasketaan tiivisteet'
+$count = New-MediaManifest -MediaRoot $media
+Write-IRequireLog "  $count tiedostoa manifestissa"
+
 # --------------------------------------------------------------
-Write-Log '8/8 Valmis'
+Write-IRequireLog '8/8 Valmis'
 # --------------------------------------------------------------
 Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 $size = (Get-ChildItem -LiteralPath $media -Recurse -File | Measure-Object Length -Sum).Sum
-Write-Log ("Media: {0} ({1})" -f $media, (Format-Size $size)) 'Ok'
-Write-Log 'Seuraavaksi: .\Build\New-iRequireUsb.ps1 -DiskNumber <tikun numero>' 'Ok'
+Write-IRequireLog ("Media: {0} ({1})" -f $media, (Format-Size $size)) 'Ok'
+Write-IRequireLog 'Seuraavaksi: .\Build\New-iRequireUsb.ps1 -DiskNumber <tikun numero>  (tai New-iRequireIso.ps1 virtuaalikonetta varten)' 'Ok'

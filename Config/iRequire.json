@@ -28,7 +28,15 @@
     "_KaikkiSisaisetLevyt": "true = tyhjennetaan kaikki sisaiset levyt. false = vain asennuslevy.",
     "KaikkiSisaisetLevyt": true,
     "_MinimikokoGt": "Asennuslevyn vahimmaiskoko.",
-    "MinimikokoGt": 40
+    "MinimikokoGt": 40,
+    "_TaysiVarmistus": "true = koko levy luetaan tyhjennyksen jalkeen takaisin (kaksinkertaistaa ajan kiintolevyilla). false = satunnaisnaytteet.",
+    "TaysiVarmistus": false,
+    "_Harjoitus": "true = HARJOITUSTILA: kaikki tarkistetaan ja naytetaan, mutta levyihin ei kirjoiteta mitaan. Kayta tata kun kokeilet tikkua ensimmaista kertaa oikealla koneella.",
+    "Harjoitus": false,
+    "_TarkistaMedia": "true = tikun tiedostojen eheys tarkistetaan ennen tyhjennysta (1-3 min). Ala poista kaytosta.",
+    "TarkistaMedia": true,
+    "_OdotaVerkkovirtaa": "true = akkukaytossa oleva kannettava odottaa laturia ennen tyhjennysta.",
+    "OdotaVerkkovirtaa": true
   },
 
   "Asennus": {
@@ -53,6 +61,8 @@
 
   "Sovellukset": {
     "_Firefox": "true = asennetaan Firefox suoraan Mozillalta. Edge jaa joka tapauksessa (tietosuojakaytannoin).",
-    "Firefox": false
+    "Firefox": false,
+    "_VCRedist": "true = Microsoft Visual C++ -ajonaikaiset kirjastot (x64 + x86). Lahes kaikki pelit tarvitsevat naita.",
+    "VCRedist": true
   }
 }

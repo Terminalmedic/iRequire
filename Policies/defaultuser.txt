@@ -158,3 +158,9 @@ User
 Control Panel\Mouse
 MouseThreshold2
 SZ:0
+
+; --- OneDriven automaattinen asennus uudelle kayttajalle pois (Pro-kuva) ---
+User
+Software\Microsoft\Windows\CurrentVersion\Run
+OneDriveSetup
+DELETE

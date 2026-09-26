@@ -307,3 +307,19 @@ Computer
 SOFTWARE\Policies\Microsoft\Edge
 PromotionalTabsEnabled
 DWORD:0
+
+; --- OneDrive ja uusi Outlook/Teams (koskee Pro-kuvaa, LTSC:ssa ei ole) ---
+Computer
+SOFTWARE\Policies\Microsoft\Windows\OneDrive
+DisableFileSyncNGSC
+DWORD:1
+
+Computer
+SOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe\OutlookUpdate
+Blocked
+DWORD:1
+
+Computer
+SOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe\DevHomeUpdate
+Blocked
+DWORD:1

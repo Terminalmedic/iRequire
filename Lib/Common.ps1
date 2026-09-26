@@ -13,10 +13,10 @@ function Start-Log {
     $dir = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     $script:LogFile = $Path
-    Write-Log ("==== {0} aloitettu ====" -f (Split-Path -Leaf $Path))
+    Write-IRequireLog ("==== {0} aloitettu ====" -f (Split-Path -Leaf $Path))
 }
 
-function Write-Log {
+function Write-IRequireLog {
     <# Kirjoittaa seka konsoliin etta lokiin. Lokin kirjoitusvirhe ei saa
        koskaan kaataa ajoa: tikku voi olla irrotettu kesken kaiken. #>
     param(
@@ -31,6 +31,22 @@ function Write-Log {
     }
 }
 
+function Get-WritableDirectory {
+    <# Ensimmainen ehdokkaista johon voi oikeasti kirjoittaa. Tikku voi olla
+       kirjoitussuojattu tai media ISO, jolloin raportit menevat muualle. #>
+    param([Parameter(Mandatory)][string[]]$Candidates)
+    foreach ($c in $Candidates) {
+        try {
+            New-Item -ItemType Directory -Path $c -Force -ErrorAction Stop | Out-Null
+            $probe = Join-Path $c '.kirjoitustesti'
+            Set-Content -LiteralPath $probe -Value 'x' -ErrorAction Stop
+            Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+            return $c
+        } catch { }
+    }
+    throw ('Mihinkaan ei voi kirjoittaa: ' + ($Candidates -join ', '))
+}
+
 function Get-IRequireConfig {
     <# Lukee asetukset. Puuttuvat kentat taydennetaan oletuksilla, jotta
        vanhemmalla asetustiedostolla varustettu tikku toimii edelleen. #>
@@ -40,11 +56,12 @@ function Get-IRequireConfig {
         Kayttaja    = @{ Nimi = 'user'; Salasana = '' }
         Kone        = @{ Nimi = '*' }
         Alue        = @{ Kayttoliittyma = 'en-US'; Alue = 'fi-FI'; Nappaimisto = '040b:0000040b'; Aikavyohyke = 'FLE Standard Time' }
-        Tyhjennys   = @{ LaskuriSekuntia = 15; Naytteita = 256; KaikkiSisaisetLevyt = $true; MinimikokoGt = 40 }
+        Tyhjennys   = @{ LaskuriSekuntia = 15; Naytteita = 256; KaikkiSisaisetLevyt = $true; MinimikokoGt = 40
+                         TaysiVarmistus = $false; Harjoitus = $false; TarkistaMedia = $true; OdotaVerkkovirtaa = $true }
         Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false }
         Wlan        = @{ Ssid = ''; Salasana = '' }
         Paivitykset = @{ MaksimiKierrokset = 6; Ajurit = $true; VerkonOdotusMinuuttia = 10 }
-        Sovellukset = @{ Firefox = $false }
+        Sovellukset = @{ Firefox = $false; VCRedist = $true }
     }
 
     $json = $null
@@ -155,6 +172,16 @@ function Test-InternetConnection {
     } catch {
         return $false
     }
+}
+
+function Wait-Internet {
+    param([int]$Minutes = 10)
+    $deadline = (Get-Date).AddMinutes($Minutes)
+    do {
+        if (Test-InternetConnection) { return $true }
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
+    return $false
 }
 
 function Format-Size {

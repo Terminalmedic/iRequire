@@ -15,6 +15,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $base = Join-Path $env:SystemDrive 'iRequire'
 . (Join-Path $base 'Lib\Common.ps1')
+. (Join-Path $base 'Lib\Stages.ps1')
 
 $stateFile = Join-Path $base 'Logs\tila.json'
 $stages = @('Kaytannot', 'Palvelut', 'Poistot', 'Verkko', 'Paivitykset', 'Sovellukset', 'Viimeistely')
@@ -32,12 +33,7 @@ function Get-State {
     if (Test-Path -LiteralPath $stateFile) {
         try { $s = Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json } catch { }
     }
-    if (-not $s) { $s = [pscustomobject]@{} }
-    $defaults = [ordered]@{ Vaihe = $stages[0]; Kierros = 0; Valmis = $false; Viesti = ''; Paivityksia = 0; Virheita = 0 }
-    foreach ($k in $defaults.Keys) {
-        if ($s.PSObject.Properties.Name -notcontains $k) { $s | Add-Member -NotePropertyName $k -NotePropertyValue $defaults[$k] }
-    }
-    return $s
+    return New-StageState -Stages $stages -Existing $s
 }
 
 function Save-State {
@@ -49,13 +45,13 @@ function Set-Status {
     param($State, [string]$Message)
     $State.Viesti = $Message
     Save-State $State
-    Write-Log $Message
+    Write-IRequireLog $Message
 }
 
 function Restart-ForStage {
     param($State, [string]$Reason)
     Save-State $State
-    Write-Log "Uudelleenkaynnistys: $Reason"
+    Write-IRequireLog "Uudelleenkaynnistys: $Reason"
     & shutdown.exe /r /t 30 /c "iRequire: $Reason. Kone kaynnistyy uudelleen ja jatkaa itsestaan."
     $mutex.ReleaseMutex()
     exit 0
@@ -77,15 +73,15 @@ function Invoke-StagePolicies {
 
     if (Test-Path -LiteralPath $lgpo) {
         foreach ($f in $files) {
-            Write-Log "LGPO: $f"
+            Write-IRequireLog "LGPO: $f"
             $out = & $lgpo /t $f 2>&1
-            $out | ForEach-Object { Write-Log ("  " + $_) }
+            $out | ForEach-Object { Write-IRequireLog ("  " + $_) }
             if ($LASTEXITCODE -ne 0) { throw "LGPO epaonnistui tiedostolle $f (koodi $LASTEXITCODE)" }
         }
     } else {
         # Varamenetelma: samat arvot suoraan rekisteriin. Toimii, mutta
         # arvot eivat nay gpeditissa kaytantoina.
-        Write-Log 'LGPO.exe puuttuu, kirjoitetaan kaytannot suoraan rekisteriin' 'Varoitus'
+        Write-IRequireLog 'LGPO.exe puuttuu, kirjoitetaan kaytannot suoraan rekisteriin' 'Varoitus'
         $userRoots = @(Get-ChildItem -LiteralPath 'Registry::HKEY_USERS' |
             Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' } |
             ForEach-Object { 'Registry::HKEY_USERS\' + $_.PSChildName })
@@ -99,7 +95,7 @@ function Invoke-StagePolicies {
             }
         }
     }
-    & gpupdate.exe /force /wait:120 2>&1 | ForEach-Object { Write-Log ("gpupdate: " + $_) }
+    & gpupdate.exe /force /wait:120 2>&1 | ForEach-Object { Write-IRequireLog ("gpupdate: " + $_) }
 }
 
 function Invoke-StageServices {
@@ -109,9 +105,9 @@ function Invoke-StageServices {
         try {
             Stop-Service -Name $name -Force -ErrorAction SilentlyContinue
             Set-Service -Name $name -StartupType Disabled
-            Write-Log "Palvelu pois kaytosta: $name"
+            Write-IRequireLog "Palvelu pois kaytosta: $name"
         } catch {
-            Write-Log ("Palvelua {0} ei voitu muuttaa: {1}" -f $name, $_.Exception.Message) 'Varoitus'
+            Write-IRequireLog ("Palvelua {0} ei voitu muuttaa: {1}" -f $name, $_.Exception.Message) 'Varoitus'
         }
     }
     foreach ($full in $debloat.Ajastukset) {
@@ -121,7 +117,7 @@ function Invoke-StageServices {
         $task = Get-ScheduledTask -TaskPath $path -TaskName $name -ErrorAction SilentlyContinue
         if ($task) {
             $task | Disable-ScheduledTask | Out-Null
-            Write-Log "Ajastus pois kaytosta: $full"
+            Write-IRequireLog "Ajastus pois kaytosta: $full"
         }
     }
 }
@@ -131,15 +127,15 @@ function Invoke-StageRemovals {
         foreach ($p in @(Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -like $pattern })) {
             try {
                 Remove-AppxProvisionedPackage -Online -PackageName $p.PackageName | Out-Null
-                Write-Log "Poistettu esiasennus: $($p.DisplayName)"
-            } catch { Write-Log ("Esiasennuksen {0} poisto epaonnistui: {1}" -f $p.DisplayName, $_.Exception.Message) 'Varoitus' }
+                Write-IRequireLog "Poistettu esiasennus: $($p.DisplayName)"
+            } catch { Write-IRequireLog ("Esiasennuksen {0} poisto epaonnistui: {1}" -f $p.DisplayName, $_.Exception.Message) 'Varoitus' }
         }
         foreach ($p in @(Get-AppxPackage -AllUsers -Name $pattern -ErrorAction SilentlyContinue)) {
             if ($p.NonRemovable) { continue }
             try {
                 Remove-AppxPackage -Package $p.PackageFullName -AllUsers
-                Write-Log "Poistettu sovellus: $($p.Name)"
-            } catch { Write-Log ("Sovelluksen {0} poisto epaonnistui: {1}" -f $p.Name, $_.Exception.Message) 'Varoitus' }
+                Write-IRequireLog "Poistettu sovellus: $($p.Name)"
+            } catch { Write-IRequireLog ("Sovelluksen {0} poisto epaonnistui: {1}" -f $p.Name, $_.Exception.Message) 'Varoitus' }
         }
     }
     $caps = @(Get-WindowsCapability -Online | Where-Object { $_.State -eq 'Installed' })
@@ -147,8 +143,8 @@ function Invoke-StageRemovals {
         foreach ($c in @($caps | Where-Object { $_.Name -like $pattern })) {
             try {
                 Remove-WindowsCapability -Online -Name $c.Name | Out-Null
-                Write-Log "Poistettu ominaisuus: $($c.Name)"
-            } catch { Write-Log ("Ominaisuuden {0} poisto epaonnistui: {1}" -f $c.Name, $_.Exception.Message) 'Varoitus' }
+                Write-IRequireLog "Poistettu ominaisuus: $($c.Name)"
+            } catch { Write-IRequireLog ("Ominaisuuden {0} poisto epaonnistui: {1}" -f $c.Name, $_.Exception.Message) 'Varoitus' }
         }
     }
     foreach ($f in $debloat.Ominaisuudet) {
@@ -156,8 +152,8 @@ function Invoke-StageRemovals {
         if ($feat -and $feat.State -eq 'Enabled') {
             try {
                 Disable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart | Out-Null
-                Write-Log "Poistettu kaytosta: $f"
-            } catch { Write-Log ("Ominaisuutta {0} ei voitu poistaa kaytosta: {1}" -f $f, $_.Exception.Message) 'Varoitus' }
+                Write-IRequireLog "Poistettu kaytosta: $f"
+            } catch { Write-IRequireLog ("Ominaisuutta {0} ei voitu poistaa kaytosta: {1}" -f $f, $_.Exception.Message) 'Varoitus' }
         }
     }
 }
@@ -184,21 +180,64 @@ function Add-WlanProfile {
 "@
     $tmp = Join-Path $env:TEMP 'irequire-wlan.xml'
     Set-Content -LiteralPath $tmp -Value $xml -Encoding UTF8
-    & netsh.exe wlan add profile filename="$tmp" user=all | ForEach-Object { Write-Log ("netsh: " + $_) }
+    & netsh.exe wlan add profile filename="$tmp" user=all | ForEach-Object { Write-IRequireLog ("netsh: " + $_) }
     Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-    & netsh.exe wlan connect name="$ssid" | ForEach-Object { Write-Log ("netsh: " + $_) }
+    & netsh.exe wlan connect name="$ssid" | ForEach-Object { Write-IRequireLog ("netsh: " + $_) }
 }
 
 function Invoke-StageNetwork {
-    if (Test-InternetConnection) { Write-Log 'Internet-yhteys toimii' 'Ok'; return $true }
+    if (Test-InternetConnection) { Write-IRequireLog 'Internet-yhteys toimii' 'Ok'; return }
     Add-WlanProfile
-    $deadline = (Get-Date).AddMinutes([int]$config.Paivitykset.VerkonOdotusMinuuttia)
-    while ((Get-Date) -lt $deadline) {
-        if (Test-InternetConnection) { Write-Log 'Internet-yhteys toimii' 'Ok'; return $true }
-        Start-Sleep -Seconds 10
-    }
-    Write-Log 'Ei internet-yhteytta: paivitykset ja sovellukset ohitetaan' 'Varoitus'
+    if (Wait-Internet -Minutes ([int]$config.Paivitykset.VerkonOdotusMinuuttia)) { Write-IRequireLog 'Internet-yhteys toimii' 'Ok'; return }
+    Write-IRequireLog 'Ei internet-yhteytta: paivitykset ja sovellukset ohitetaan' 'Varoitus'
+}
+
+function Test-OnlineForStage {
+    <# Kaynnistyksen jalkeen verkko nousee vasta hetken kuluttua, joten
+       odotetaan ennen kuin vaihe ohitetaan verkon puuttumisen vuoksi. #>
+    param([string]$What)
+    if (Wait-Internet -Minutes ([int]$config.Paivitykset.VerkonOdotusMinuuttia)) { return $true }
+    Write-IRequireLog "$What ohitettu: ei verkkoa" 'Varoitus'
     return $false
+}
+
+function Invoke-StageUpdates {
+    param($State)
+    if (-not (Test-OnlineForStage 'Paivitykset')) { return }
+    $max = [int]$config.Paivitykset.MaksimiKierrokset
+    while ($State.Kierros -lt $max) {
+        $State.Kierros++
+        Set-Status $State ("Windows Update, kierros {0}/{1}" -f $State.Kierros, $max)
+        $r = Invoke-UpdateRound
+        $State.Paivityksia += $r.Count
+        Write-IRequireLog ("Kierros {0}: {1} paivitysta asennettu" -f $State.Kierros, $r.Count)
+        if ($r.Reboot) { return (New-RebootRequest 'paivitykset vaativat uudelleenkaynnistyksen') }
+        if ($r.Count -eq 0) { return }
+    }
+    Write-IRequireLog "Paivityskierrosten enimmaismaara ($max) taynna" 'Varoitus'
+}
+
+function Invoke-StageApps {
+    param($State)
+    if (-not ($config.Sovellukset.VCRedist -or $config.Sovellukset.Firefox)) { return }
+    if (-not (Test-OnlineForStage 'Sovellukset')) { return }
+    if ($config.Sovellukset.VCRedist) {
+        Set-Status $State 'Asennetaan Visual C++ -kirjastot'
+        # 3010 = onnistui, vaatii uudelleenkaynnistyksen; 1638 = uudempi jo asennettu
+        foreach ($arch in @('x64', 'x86')) {
+            try {
+                Install-SignedInstaller -Url "https://aka.ms/vs/17/release/vc_redist.$arch.exe" -Publisher 'Microsoft Corporation' `
+                    -Arguments '/install /quiet /norestart' -Name "Visual C++ $arch" -OkCodes @(0, 1638, 3010)
+            } catch { Write-IRequireLog $_.Exception.Message 'Varoitus' }
+        }
+    }
+    if ($config.Sovellukset.Firefox) {
+        Set-Status $State 'Asennetaan Firefox'
+        try {
+            Install-SignedInstaller -Url 'https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=fi' `
+                -Publisher 'Mozilla Corporation' -Arguments '/S' -Name 'Firefox'
+        } catch { Write-IRequireLog $_.Exception.Message 'Varoitus' }
+    }
 }
 
 function Invoke-UpdateRound {
@@ -218,7 +257,7 @@ function Invoke-UpdateRound {
             if ($u.BrowseOnly) { continue }   # valinnaiset esiversiot
             if (-not $u.EulaAccepted) { $u.AcceptEula() }
             [void]$coll.Add($u)
-            Write-Log ("  loytyi: " + $u.Title)
+            Write-IRequireLog ("  loytyi: " + $u.Title)
         }
     }
     if ($coll.Count -eq 0) { return [pscustomobject]@{ Count = 0; Reboot = $false } }
@@ -233,25 +272,29 @@ function Invoke-UpdateRound {
     $ok = 0
     for ($i = 0; $i -lt $coll.Count; $i++) {
         $code = $r.GetUpdateResult($i).ResultCode   # 2 = onnistui, 3 = onnistui varoituksin
-        if ($code -in 2, 3) { $ok++ } else { Write-Log ("  epaonnistui (koodi {0}): {1}" -f $code, $coll.Item($i).Title) 'Varoitus' }
+        if ($code -in 2, 3) { $ok++ } else { Write-IRequireLog ("  epaonnistui (koodi {0}): {1}" -f $code, $coll.Item($i).Title) 'Varoitus' }
     }
     return [pscustomobject]@{ Count = $ok; Reboot = [bool]$r.RebootRequired }
 }
 
-function Install-Firefox {
-    $url = 'https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=fi'
-    $file = Join-Path $env:TEMP 'firefox-setup.exe'
+function Install-SignedInstaller {
+    <# Lataa asennusohjelman, tarkistaa julkaisijan allekirjoituksen ja
+       ajaa sen. Allekirjoittamatonta tai vaaran julkaisijan tiedostoa ei ajeta. #>
+    param([string]$Url, [string]$Publisher, [string]$Arguments, [string]$Name, [int[]]$OkCodes = @(0))
+    $file = Join-Path $env:TEMP ("irequire-" + [guid]::NewGuid().ToString('N') + '.exe')
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    (New-Object System.Net.WebClient).DownloadFile($url, $file)
-    $sig = Get-AuthenticodeSignature -FilePath $file
-    if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Mozilla Corporation') {
-        Remove-Item -LiteralPath $file -Force
-        throw "Firefox-asennusohjelman allekirjoitus ei kelpaa ($($sig.Status))"
+    (New-Object System.Net.WebClient).DownloadFile($Url, $file)
+    try {
+        $sig = Get-AuthenticodeSignature -FilePath $file
+        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch [regex]::Escape($Publisher)) {
+            throw "$Name`: allekirjoitus ei kelpaa ($($sig.Status), $($sig.SignerCertificate.Subject))"
+        }
+        $p = Start-Process -FilePath $file -ArgumentList $Arguments -Wait -PassThru
+        if ($OkCodes -notcontains $p.ExitCode) { throw "$Name`: asennus palautti koodin $($p.ExitCode)" }
+        Write-IRequireLog "$Name asennettu" 'Ok'
+    } finally {
+        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
     }
-    $p = Start-Process -FilePath $file -ArgumentList '/S' -Wait -PassThru
-    Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
-    if ($p.ExitCode -ne 0) { throw "Firefox-asennus palautti koodin $($p.ExitCode)" }
-    Write-Log 'Firefox asennettu' 'Ok'
 }
 
 function Find-UsbStick {
@@ -281,16 +324,25 @@ function Write-Summary {
     } else {
         $t.Add('Kaikilla laitteilla on toimiva ajuri.')
     }
+    $t.Add('')
+    foreach ($gpu in @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)) {
+        $t.Add(('Naytonohjain: {0} (ajuri {1})' -f $gpu.Name, $gpu.DriverVersion))
+        # Windows Updaten naytonohjainajuri on toimiva mutta usein vanha. Peleihin kannattaa valmistajan oma.
+        if ($gpu.Name -match 'NVIDIA') { $t.Add('  Peleihin: uusin ajuri osoitteesta https://www.nvidia.com/drivers') }
+        elseif ($gpu.Name -match 'AMD|Radeon') { $t.Add('  Peleihin: uusin ajuri osoitteesta https://www.amd.com/support') }
+        elseif ($gpu.Name -match 'Intel') { $t.Add('  Peleihin: uusin ajuri osoitteesta https://www.intel.com/content/www/us/en/download-center/home.html') }
+        elseif ($gpu.Name -match 'Basic Display|Perusnaytto') { $t.Add('  VAROITUS: naytonohjaimelle ei loytynyt ajuria') }
+    }
     $path = Join-Path $base 'Reports\yhteenveto.txt'
     $t | Set-Content -LiteralPath $path -Encoding UTF8
-    Write-Log "Yhteenveto: $path" 'Ok'
+    Write-IRequireLog "Yhteenveto: $path" 'Ok'
 }
 
 function Invoke-StageFinish {
     param($State)
-    try { Update-MpSignature -ErrorAction Stop; Write-Log 'Defenderin maaritykset paivitetty' } catch { }
+    try { Update-MpSignature -ErrorAction Stop; Write-IRequireLog 'Defenderin maaritykset paivitetty' } catch { }
 
-    Write-Log 'Siivotaan komponenttivarasto (vapauttaa levytilaa)'
+    Write-IRequireLog 'Siivotaan komponenttivarasto (vapauttaa levytilaa)'
     & dism.exe /Online /Cleanup-Image /StartComponentCleanup /Quiet | Out-Null
 
     if (-not $config.Asennus.AutomaattikirjautuminenPysyva) {
@@ -299,11 +351,13 @@ function Invoke-StageFinish {
         foreach ($n in @('DefaultPassword', 'AutoLogonCount')) {
             Remove-ItemProperty -LiteralPath $wl -Name $n -ErrorAction SilentlyContinue
         }
-        Write-Log 'Automaattinen kirjautuminen poistettu'
+        Write-IRequireLog 'Automaattinen kirjautuminen poistettu'
     }
 
     Write-Summary -State $State
     Remove-Item -LiteralPath (Join-Path $base 'ASENNUS-KESKEN.tag') -Force -ErrorAction SilentlyContinue
+    # Salasanat eivat saa jaada koneelle.
+    Remove-Item -LiteralPath (Join-Path $base 'Config\iRequire.json') -Force -ErrorAction SilentlyContinue
 
     $usb = Find-UsbStick
     if ($usb) {
@@ -311,7 +365,7 @@ function Invoke-StageFinish {
         New-Item -ItemType Directory -Path $dst -Force | Out-Null
         Copy-Item -Path (Join-Path $base 'Reports\*') -Destination $dst -Force -ErrorAction SilentlyContinue
         Copy-Item -Path (Join-Path $base 'Logs\*.log') -Destination $dst -Force -ErrorAction SilentlyContinue
-        Write-Log "Raportit kopioitu tikulle: $dst" 'Ok'
+        Write-IRequireLog "Raportit kopioitu tikulle: $dst" 'Ok'
     }
 }
 
@@ -321,73 +375,32 @@ function Invoke-StageFinish {
 
 $state = Get-State
 if ($state.Valmis) { $mutex.ReleaseMutex(); exit 0 }
-$online = $true
+
+$handlers = @{
+    'Kaytannot'   = { param($s) Set-Status $s 'Otetaan ryhmakaytannot kayttoon'; Invoke-StagePolicies }
+    'Palvelut'    = { param($s) Set-Status $s 'Pysaytetaan telemetriapalvelut ja -ajastukset'; Invoke-StageServices }
+    'Poistot'     = { param($s) Set-Status $s 'Poistetaan turhat sovellukset ja ominaisuudet'; Invoke-StageRemovals }
+    'Verkko'      = { param($s) Set-Status $s 'Odotetaan verkkoyhteytta'; Invoke-StageNetwork }
+    'Paivitykset' = { param($s) Invoke-StageUpdates -State $s }
+    'Sovellukset' = { param($s) Invoke-StageApps -State $s }
+    'Viimeistely' = { param($s) Set-Status $s 'Viimeistellaan'; Invoke-StageFinish -State $s }
+}
 
 try {
-    for ($i = [Array]::IndexOf($stages, [string]$state.Vaihe); $i -lt $stages.Count; $i++) {
-        $state.Vaihe = $stages[$i]
-        switch ($state.Vaihe) {
-            'Kaytannot'   { Set-Status $state 'Otetaan ryhmakaytannot kayttoon'; Invoke-StagePolicies }
-            'Palvelut'    { Set-Status $state 'Pysaytetaan telemetriapalvelut ja -ajastukset'; Invoke-StageServices }
-            'Poistot'     { Set-Status $state 'Poistetaan turhat sovellukset ja ominaisuudet'; Invoke-StageRemovals }
-            'Verkko'      { Set-Status $state 'Odotetaan verkkoyhteytta'; $online = Invoke-StageNetwork }
-            'Paivitykset' {
-                if (-not $online -and -not (Test-InternetConnection)) { Write-Log 'Paivitykset ohitettu: ei verkkoa' 'Varoitus'; break }
-                while ($state.Kierros -lt [int]$config.Paivitykset.MaksimiKierrokset) {
-                    $state.Kierros++
-                    Set-Status $state ("Windows Update, kierros {0}/{1}" -f $state.Kierros, $config.Paivitykset.MaksimiKierrokset)
-                    $r = Invoke-UpdateRound
-                    $state.Paivityksia += $r.Count
-                    Write-Log ("Kierros {0}: {1} paivitysta asennettu" -f $state.Kierros, $r.Count)
-                    if ($r.Reboot) { Restart-ForStage $state 'paivitykset vaativat uudelleenkaynnistyksen' }
-                    if ($r.Count -eq 0) { break }
-                }
-            }
-            'Sovellukset' {
-                if ($config.Sovellukset.Firefox -and (Test-InternetConnection)) {
-                    Set-Status $state 'Asennetaan Firefox'
-                    try { Install-Firefox } catch { Write-Log ('Firefox: ' + $_.Exception.Message) 'Varoitus' }
-                }
-            }
-            'Viimeistely' { Set-Status $state 'Viimeistellaan'; Invoke-StageFinish -State $state }
-        }
-        # Seuraava vaihe talteen heti, ettei valmista vaihetta ajeta turhaan uudelleen.
-        if ($i + 1 -lt $stages.Count) {
-            $state.Vaihe = $stages[$i + 1]
-            if ($state.Vaihe -eq 'Paivitykset') { $state.Kierros = 0 }
-        }
-        $state.Virheita = 0
-        Save-State $state
-    }
-
-    $state.Valmis = $true
-    Set-Status $state 'Valmis'
-    Unregister-ScheduledTask -TaskName 'iRequire' -Confirm:$false -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName 'iRequire-edistys' -Confirm:$false -ErrorAction SilentlyContinue
-    Write-Log 'Jalkiasennus valmis' 'Ok'
-    Restart-ForStage $state 'asennus valmis'
-} catch {
-    Write-Log ("VIRHE vaiheessa {0}: {1}" -f $state.Vaihe, $_.Exception.Message) 'Virhe'
-    Write-Log ($_.ScriptStackTrace) 'Virhe'
-    # Sama vaihe yritetaan kerran uudelleen; toisen virheen jalkeen se
-    # ohitetaan, jottei yksi rikkinainen kohta pysayta koko asennusta.
-    $state.Virheita++
-    $idx = [Array]::IndexOf($stages, [string]$state.Vaihe)
-    if ($state.Virheita -ge 2) {
-        Write-Log ("Vaihe {0} ohitetaan toistuvan virheen vuoksi" -f $state.Vaihe) 'Varoitus'
-        $state.Virheita = 0
-        if ($idx -ge 0 -and $idx + 1 -lt $stages.Count) {
-            $state.Vaihe = $stages[$idx + 1]
-        } else {
-            # Viimeinen vaihe: lopetetaan kokonaan, ei uudelleenkaynnistyssilmukkaa.
-            $state.Valmis = $true
-            Set-Status $state 'Valmis (viimeistely epaonnistui, katso loki)'
+    $result = Invoke-StageMachine -State $state -Stages $stages -Handlers $handlers -Save { param($s) Save-State $s }
+    switch ($result.Result) {
+        'Reboot' { Restart-ForStage $state $result.Reason }
+        default {
             Unregister-ScheduledTask -TaskName 'iRequire' -Confirm:$false -ErrorAction SilentlyContinue
             Unregister-ScheduledTask -TaskName 'iRequire-edistys' -Confirm:$false -ErrorAction SilentlyContinue
-            return
+            Write-IRequireLog ('Jalkiasennus paattyi: ' + $result.Reason) 'Ok'
+            if ($result.Result -eq 'Done') { Restart-ForStage $state 'asennus valmis' }
         }
     }
-    Restart-ForStage $state ("virhe vaiheessa {0}, yritetaan uudelleen" -f $state.Vaihe)
+} catch {
+    # Tilakone itse ei heita; tama on viimeinen turvaverkko. Ei uudelleen-
+    # kaynnistysta: seuraava kaynnistys yrittaa joka tapauksessa uudelleen.
+    Write-IRequireLog ('Odottamaton virhe: ' + $_.Exception.Message) 'Virhe'
 } finally {
     try { $mutex.ReleaseMutex() } catch { }
 }

@@ -7,10 +7,10 @@
 # ==============================================================
 
 function Select-TargetDisk {
-    <# Windows menee nopeimmalle levylle: NVMe > SSD > HDD, tasatilanteessa
+    <# Windows menee nopeimmalle levylle: NVMe > SSD > eMMC > tuntematon > HDD, tasatilanteessa
        pienin levynumero. Liian pienet levyt ohitetaan. #>
     param([Parameter(Mandatory)]$Disks, [int]$MinimumGb = 40)
-    $rank = @{ 'NVMe' = 0; 'SSD' = 1; 'HDD' = 2; 'Tuntematon' = 3 }
+    $rank = @{ 'NVMe' = 0; 'SSD' = 1; 'eMMC' = 2; 'Tuntematon' = 3; 'HDD' = 4 }
     $ok = @($Disks | Where-Object { $_.Size -ge ([int64]$MinimumGb * 1GB) })
     if ($ok.Count -eq 0) { return $null }
     return $ok | Sort-Object @{ Expression = { $rank[$_.Kind] } }, Number | Select-Object -First 1
@@ -38,7 +38,7 @@ function Invoke-Diskpart {
     $script = Join-Path $WorkDir 'diskpart.txt'
     $Commands | Set-Content -LiteralPath $script -Encoding ASCII
     $out = & diskpart.exe /s $script 2>&1
-    $out | ForEach-Object { Write-Log ("diskpart: " + $_) }
+    $out | ForEach-Object { Write-IRequireLog ("diskpart: " + $_) }
     if ($LASTEXITCODE -ne 0) { throw "diskpart epaonnistui (koodi $LASTEXITCODE)" }
 }
 
@@ -84,7 +84,7 @@ function Install-WindowsImage {
     $img = Get-InstallImage -UsbRoot $UsbRoot
     $dismArgs = @('/Apply-Image', "/ImageFile:$($img.File)", '/Index:1', "/ApplyDir:$Target\")
     if ($img.Split) { $dismArgs += "/SWMFile:$($img.Split)" }
-    Write-Log ("Puretaan {0} -> {1}" -f $img.File, $Target)
+    Write-IRequireLog ("Puretaan {0} -> {1}" -f $img.File, $Target)
     & dism.exe @dismArgs
     if ($LASTEXITCODE -ne 0) { throw "Kuvan purku epaonnistui (DISM $LASTEXITCODE)" }
 }
@@ -96,9 +96,9 @@ function Add-MachineDrivers {
     $dir = Join-Path $UsbRoot 'iRequire\Drivers'
     if (-not (Test-Path -LiteralPath $dir)) { return }
     if (-not (Get-ChildItem -LiteralPath $dir -Recurse -Filter *.inf -ErrorAction SilentlyContinue | Select-Object -First 1)) { return }
-    Write-Log 'Lisataan tikun ajurit asennukseen'
+    Write-IRequireLog 'Lisataan tikun ajurit asennukseen'
     & dism.exe "/Image:$Target\" /Add-Driver "/Driver:$dir" /Recurse
-    if ($LASTEXITCODE -ne 0) { Write-Log "Ajurien lisays palautti koodin $LASTEXITCODE" 'Varoitus' }
+    if ($LASTEXITCODE -ne 0) { Write-IRequireLog "Ajurien lisays palautti koodin $LASTEXITCODE" 'Varoitus' }
 }
 
 function ConvertTo-XmlText {
@@ -187,14 +187,37 @@ function Set-InternalBootFirst {
                 $id = $Matches[1]
                 & bcdedit.exe /set '{fwbootmgr}' displayorder $id /addfirst | Out-Null
                 & bcdedit.exe /set '{fwbootmgr}' bootsequence $id | Out-Null
-                Write-Log "Kaynnistysjarjestys: $id ensimmaiseksi"
+                Write-IRequireLog "Kaynnistysjarjestys: $id ensimmaiseksi"
                 return
             }
         }
-        Write-Log 'Windows Boot Manageria ei loytynyt laiteohjelmiston listasta' 'Varoitus'
+        Write-IRequireLog 'Windows Boot Manageria ei loytynyt laiteohjelmiston listasta' 'Varoitus'
     } catch {
-        Write-Log ('Kaynnistysjarjestyksen asetus epaonnistui: ' + $_.Exception.Message) 'Varoitus'
+        Write-IRequireLog ('Kaynnistysjarjestyksen asetus epaonnistui: ' + $_.Exception.Message) 'Varoitus'
     }
+}
+
+function Test-Deployment {
+    <# Viimeinen tarkistus ennen uudelleenkaynnistysta: jos jokin puuttuu,
+       on parempi pysahtya tahan virheilmoitukseen kuin kaynnistaa kone
+       joka ei kaynnisty. #>
+    param([Parameter(Mandatory)][string]$Windows, [Parameter(Mandatory)][string]$System, [Parameter(Mandatory)][string]$Firmware)
+    $must = @(
+        "$Windows\Windows\System32\config\SYSTEM",
+        "$Windows\Windows\System32\winload.efi",
+        "$Windows\Windows\Panther\unattend.xml",
+        "$Windows\Windows\Setup\Scripts\SetupComplete.cmd",
+        "$Windows\iRequire\PostInstall\Invoke-PostInstall.ps1",
+        "$Windows\iRequire\Lib\Common.ps1",
+        "$Windows\iRequire\Lib\Stages.ps1",
+        "$Windows\iRequire\Config\iRequire.json",
+        "$Windows\iRequire\Policies\Debloat.json"
+    )
+    if ($Firmware -eq 'UEFI') { $must += "$System\EFI\Microsoft\Boot\bootmgfw.efi"; $must += "$System\EFI\Microsoft\Boot\BCD" }
+    else { $must += "$System\bootmgr"; $must += "$System\Boot\BCD" }
+    $missing = @($must | Where-Object { -not (Test-Path -LiteralPath $_) })
+    if ($missing.Count -gt 0) { throw ('Asennuksesta puuttuu: ' + ($missing -join ', ')) }
+    Write-IRequireLog 'Asennus tarkistettu: kaynnistystiedostot, vastaustiedosto ja jalkiasennus paikallaan' 'Ok'
 }
 
 function Find-PendingInstall {
