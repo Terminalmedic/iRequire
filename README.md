@@ -153,8 +153,12 @@ Suurimmat suorituskykyerot tulevat laitteistosta ja BIOSista, joita mikään Win
 - **[TOIMI] Yksi muistikampa:** muisti toimii yksikanavaisena, jolloin muistikaista on puolet pienempi.
 - **[TOIMI] Näyttö kytketty emolevyyn:** pelit pyörivät integroidulla grafiikalla, vaikka koneessa on erillinen näytönohjain.
 - **[TOIMI] Ei näytönohjaimen ajuria,** tai **Windows kiintolevyllä.**
+- **[TOIMI] Secure Boot pois tai TPM 2.0 puuttuu:** osa kilpailullisista peleistä (esim. Valorant, Battlefield 6) ei käynnisty ilman niitä. Molemmat kytketään BIOSista (TPM: Intel PTT / AMD fTPM).
 - **[HUOMIO]** Näyttö ei toimi suurimmalla taajuudellaan, esimerkiksi HDMI 1.4 -kaapelin takia.
-- **Tietoturvan tila:** Defender, palomuuri, HVCI, Secure Boot ja BitLocker.
+- **[TOIMI] Ohitetut vaiheet:** jos jokin jälkiasennuksen vaihe epäonnistui kahdesti, se kerrotaan heti yhteenvedon alussa virheineen.
+- **Tietoturvan tila:** Defender (ja ASR-sääntöjen määrä Defenderin mukaan), palomuuri, HVCI, Secure Boot, TPM ja BitLocker.
+
+Saman pelikuntotarkistuksen voi ajaa jo ennen asennusta koneen vanhassa Windowsissa: `iRequire\Tools\Test-TargetMachine.ps1`.
 
 ### Ammattilaisoptimoijien säädöt: mitä testit sanovat
 
