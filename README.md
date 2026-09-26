@@ -218,22 +218,30 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 
 ## Testaus
 
-```powershell
-.\Tests\Test-iRequire.ps1
-```
+Kolme tasoa. Kaksi ensimmäistä ajetaan automaattisesti oikealla Windowsilla (GitHub Actions, Windows PowerShell 5.1, sama kuin WinPE:ssä):
 
-Testit ajetaan jokaisella commitilla CI:ssä oikealla Windowsilla. Ne kattavat:
+**1. `Tests\Test-iRequire.ps1`: jokaisella commitilla.** Noin 50 tarkistusta:
+- **Tyhjennys päästä päähän:** levy korvataan testitiedostolla, jolle ajetaan HDD-ylikirjoitus, NVMe:n kryptografinen tyhjennys, "valehteleva" SSD, tukematon komento ja simuloitu viallinen sektori. Todistus kirjoitetaan.
+- **Tilakone:** simuloidut uudelleenkäynnistykset, virheet ja vioittunut tila. Silmukka on todistetusti mahdoton.
+- **Pelikunto- ja virityspäätökset:** RAM, näytöt, näytönohjaimen tunnistus ja virrankäyttö.
+- **Tietoturva:** mikään asetus ei saa heikentää Defenderiä, palomuuria, UAC:ta, SmartScreenia, VBS:ää tai päivityksiä.
+- **Tikun eheys, vastaustiedosto, levyjen luokittelu** ja kirjoitusvirheet funktiokutsuissa.
+- **Windows-integraatio** (vain lukevat testit):
+  - suora levyn luku Win32-kutsuilla
+  - levyjen luokittelu oikealla raudalla
+  - `bcdedit`-tulosteen tunnistus
+  - näyttötilojen luku
+  - rekisterikirjoitus
 
-- **Tyhjennys päästä päähän:** levy korvataan testitiedostolla, jolle ajetaan HDD-ylikirjoitus, NVMe:n kryptografinen tyhjennys, "valehteleva" SSD, tukematon komento ja simuloitu viallinen sektori.
-- **Tilakone:** simuloidut uudelleenkäynnistykset, virheet ja vioittunut tila.
-- **Tikun eheys:** vioittunut, puuttuva ja muokattu tiedosto.
-- **Levyjen luokittelu:** eMMC, muistikortit ja ulkoiset levyt.
-- **Vastaustiedosto:** muodostus ja salasanan erikoismerkit.
-- **Kirjoitusvirheet:** kutsu määrittelemättömään funktioon.
-- **Asetukset:** tuntemattomat asetusavaimet.
-- **Poistolista:** suojatut sovellukset ja palvelut eivät ole listalla.
+**2. `.github/workflows/build.yml`: kun rakennus muuttuu, tai käsin.**
+- Asentaa ADK:n ja WinPE:n sekä lataa virallisen ISOn. Tiiviste tarkistetaan.
+- Ajaa `Build-iRequire.ps1`:n ja `New-iRequireIso.ps1`:n.
+- `Tests\Test-BuildOutput.ps1` liittää valmiit kuvat vain luku -tilassa ja tarkistaa:
+  - boot.wim: PowerShell, Storage-moduuli ja käynnistin
+  - asennuskuva: .NET 3.5, SMB1, oletuskäyttäjän asetukset ja poistetut sovellukset
+  - eheysmanifesti
 
-Testit eivät voi ajaa WinPE:tä eivätkä koskea oikeisiin levyihin. Siksi [ensimmäinen kerta](#ensimmäinen-kerta-näin-varmistat-että-se-toimii) tehdään virtuaalikoneessa ja harjoitustilassa.
+**3. Virtuaalikone ja harjoitustila: sinä, ennen oikeaa konetta.** CI ei voi käynnistää WinPE:tä, joten [ensimmäinen kerta](#ensimmäinen-kerta-näin-varmistat-että-se-toimii) ajetaan Hyper-V:ssä (`Tests\New-TestVm.ps1`) ja sen jälkeen harjoitustilassa oikealla koneella.
 
 ## Rakenne
 

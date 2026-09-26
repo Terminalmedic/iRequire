@@ -98,13 +98,16 @@ Check 'Asennuskuva: .NET 3.5, SMB1 pois, oletuskayttajan asetukset' {
     $swm = Join-Path $MediaDir 'sources\install.swm'
     $m = Join-Path $MountDir 'install'
     New-Item -ItemType Directory -Path $m -Force | Out-Null
+    $image = Join-Path $MediaDir 'sources\install.wim'
     if (Test-Path -LiteralPath $swm) {
-        # Pilkotun kuvan liittaminen vaatii kaikki osat (/SWMFile).
-        & dism.exe /Mount-Image "/ImageFile:$swm" "/SWMFile:$(Join-Path $MediaDir 'sources\install*.swm')" /Index:1 "/MountDir:$m" /ReadOnly | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "DISM /Mount-Image epaonnistui ($LASTEXITCODE)" }
-    } else {
-        Mount-WindowsImage -ImagePath (Join-Path $MediaDir 'sources\install.wim') -Index 1 -Path $m -ReadOnly | Out-Null
+        # Pilkottua kuvaa ei voi liittaa (DISM virhe 87), joten palat
+        # yhdistetaan ensin valiaikaiseksi kuvaksi. Asennus itse kayttaa
+        # /Apply-Image /SWMFile, joka tukee palasia suoraan.
+        $image = Join-Path $MountDir 'yhdistetty.wim'
+        Export-WindowsImage -SourceImagePath $swm -SplitImageFilePattern (Join-Path $MediaDir 'sources\install*.swm') `
+            -SourceIndex 1 -DestinationImagePath $image -CompressionType none | Out-Null
     }
+    Mount-WindowsImage -ImagePath $image -Index 1 -Path $m -ReadOnly | Out-Null
     try {
         $netfx = Get-WindowsOptionalFeature -Path $m -FeatureName NetFx3
         Assert-True ($netfx.State -eq 'Enabled') ".NET 3.5: $($netfx.State)"
@@ -140,7 +143,7 @@ Check 'Asennuskuva: .NET 3.5, SMB1 pois, oletuskayttajan asetukset' {
             Assert-True ($prov -notcontains $bad) "$bad on yha esiasennettu"
         }
     } finally {
-        & dism.exe /Unmount-Image "/MountDir:$m" /Discard | Out-Null
+        Dismount-WindowsImage -Path $m -Discard | Out-Null
     }
 }
 
