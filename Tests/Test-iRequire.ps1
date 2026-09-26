@@ -87,7 +87,8 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
 }
 
 Test-Case 'Skriptit ovat ASCII-muotoisia (WinPE-konsoli ja PS 5.1 ilman BOMia)' {
-    $files = @(Get-ChildItem -Path (Join-Path $root '*') -Recurse -File -Include *.ps1, *.cmd, *.ini, *.txt)
+    # -Include kayttaytyy eri tavoin PS 5.1:ssa ja 7:ssa, joten suodatetaan itse.
+    $files = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension -in @('.ps1', '.cmd', '.ini', '.txt') })
     Assert-True ($files.Count -gt 15) "Tarkistettiin vain $($files.Count) tiedostoa"
     foreach ($f in $files) {
         $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
@@ -454,6 +455,18 @@ function Invoke-SimulatedBoots {
 }
 
 $simStages = @('A', 'Paivitykset', 'B')
+
+Test-Case 'Jalkiasennus: jokaisella vaiheella on kasittelija ja paivitykset ennen viimeistelya' {
+    $text = Get-Content -LiteralPath (Join-Path $root 'PostInstall\Invoke-PostInstall.ps1') -Raw
+    $m = [regex]::Match($text, '\$stages = @\(([^)]*)\)')
+    Assert-True $m.Success 'Vaihelistaa ei loytynyt'
+    $names = @([regex]::Matches($m.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+    foreach ($n in $names) {
+        Assert-True ($text -match ("(?m)^\s*'" + [regex]::Escape($n) + "'\s*=\s*\{")) "Vaiheelta $n puuttuu kasittelija"
+    }
+    Assert-True ($names[-1] -eq 'Viimeistely') 'Viimeistely ei ole viimeinen'
+    Assert-True ([Array]::IndexOf($names, 'Verkko') -lt [Array]::IndexOf($names, 'Paivitykset')) 'Verkko paivitysten jalkeen'
+}
 
 Test-Case 'Tilakone: kaikki vaiheet kerran, yksi kaynnistys' {
     $script:Calls = New-Object System.Collections.Generic.List[string]
