@@ -827,6 +827,18 @@ Test-Case 'Tyhjennyksen kestoarvio laskurin ruudulle' {
     Assert-True ((Format-Duration 30) -eq 'alle 2 min' -and (Format-Duration 600) -eq '10 min' -and (Format-Duration 5400) -eq '1.5 h') 'Format-Duration'
 }
 
+Test-Case 'Turvallisuus: odottamaton kaatuminen WinPE:ssa ei kaynnista tikkua alusta' {
+    # winpeshl kaynnistaa WinPE:n uudelleen kun Bootstrap paattyy. Kaatumisen
+    # jalkeen se kaynnistaisi saman tikun uudelleen -> pysahdyttava.
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'WinPE\Bootstrap.ps1'), [ref]$null, [ref]$null)
+    $run = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.Extent.Text -match 'Start-iRequire\.ps1' }, $true))
+    Assert-True ($run.Count -eq 1) 'Start-iRequiren kaynnistys puuttuu'
+    $guard = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
+        $n.Clauses[0].Item1.Extent.Text -match 'LASTEXITCODE\s+-ne\s+0' -and $n.Clauses[0].Item2.Extent.Text -match 'wpeutil\.exe shutdown' }, $true))
+    Assert-True ($guard.Count -eq 1 -and $guard[0].Extent.StartOffset -gt $run[0].Extent.EndOffset) 'kaatumisen jalkeen ei pysahdyta (WinPE kaynnistyisi uudelleen)'
+    Assert-True ($guard[0].Clauses[0].Item2.Extent.Text -notmatch 'wpeutil\.exe reboot') 'kaatumisen jalkeen uudelleenkaynnistys'
+}
+
 Test-Case 'Turvallisuus: harjoitustila pysahtyy ennen yhtakaan kirjoittavaa kutsua' {
     # Rakennetesti: tuleva muutos ei saa siirtaa levylle kirjoittavaa kutsua
     # harjoitustilan pysahdyksen eteen, eika laskuria/tarkistuksia sen jalkeen.

@@ -27,3 +27,16 @@ if (-not $root) {
 }
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$root\iRequire\WinPE\Start-iRequire.ps1" -UsbRoot $root
+
+# Kun taman skriptin ajo loppuu, WinPE kaynnistyy uudelleen (winpeshl). Jos
+# Start-iRequire kaatui odottamatta (esim. jasennysvirhe), uudelleenkaynnistys
+# kaynnistaisi saman tikun alusta - pysahdytaan sen sijaan ja naytetaan syy.
+# Onnistunut ajo on jo pyytanyt uudelleenkaynnistyksen itse (koodi 0).
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ''
+    Write-Host ("iRequire pysahtyi odottamatta (koodi {0})." -f $LASTEXITCODE) -ForegroundColor Red
+    Write-Host ("Loki: {0}\iRequire\Reports tai X:\iRequire\Reports" -f $root) -ForegroundColor Yellow
+    Write-Host 'Kone ei kaynnisty uudelleen itsestaan. Komentokehote avautuu; sulkeminen sammuttaa koneen.' -ForegroundColor Yellow
+    & cmd.exe
+    & wpeutil.exe shutdown
+}
