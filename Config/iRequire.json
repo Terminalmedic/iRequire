@@ -1,0 +1,93 @@
+{
+  "_kuvaus": "iRequire-asetukset. Tiedosto kopioidaan tikulle, joten sita voi muokata tikulla ilman uudelleenrakennusta.",
+
+  "Kayttaja": {
+    "_kuvaus": "Paikallinen jarjestelmanvalvojatili. Tyhja salasana = kirjautuu suoraan tyopoydalle.",
+    "Nimi": "user",
+    "Salasana": ""
+  },
+
+  "Kone": {
+    "_Nimi": "* = Windows arpoo nimen. Enintaan 15 merkkia, ei valilyonteja.",
+    "Nimi": "*"
+  },
+
+  "Alue": {
+    "_Kayttoliittyma": "Asennuskuvan kieli. Kaytetaan vain, jos kuvassa on kyseinen kielipaketti.",
+    "Kayttoliittyma": "en-US",
+    "Alue": "fi-FI",
+    "Nappaimisto": "040b:0000040b",
+    "Aikavyohyke": "FLE Standard Time"
+  },
+
+  "Tyhjennys": {
+    "_LaskuriSekuntia": "Aika jonka kuluessa Esc peruu kaiken. Tyhjennys alkaa vasta taman jalkeen.",
+    "LaskuriSekuntia": 15,
+    "_Naytteita": "Montako satunnaista kohtaa levylta luetaan ennen ja jalkeen tyhjennyksen varmistusta varten.",
+    "Naytteita": 256,
+    "_KaikkiSisaisetLevyt": "true = tyhjennetaan kaikki sisaiset levyt. false = vain asennuslevy.",
+    "KaikkiSisaisetLevyt": true,
+    "_MinimikokoGt": "Asennuslevyn vahimmaiskoko.",
+    "MinimikokoGt": 40,
+    "_TaysiVarmistus": "true = koko levy luetaan tyhjennyksen jalkeen takaisin (kaksinkertaistaa ajan kiintolevyilla). false = satunnaisnaytteet.",
+    "TaysiVarmistus": false,
+    "_Harjoitus": "true = HARJOITUSTILA: kaikki tarkistetaan ja naytetaan, mutta levyihin ei kirjoiteta mitaan. Kayta tata kun kokeilet tikkua ensimmaista kertaa oikealla koneella.",
+    "Harjoitus": false,
+    "_TarkistaMedia": "true = tikun tiedostojen eheys tarkistetaan ennen tyhjennysta (1-3 min). Ala poista kaytosta.",
+    "TarkistaMedia": true,
+    "_OdotaVerkkovirtaa": "true = akkukaytossa oleva kannettava odottaa laturia ennen tyhjennysta.",
+    "OdotaVerkkovirtaa": true
+  },
+
+  "Asennus": {
+    "_Tuoteavain": "Tyhja = ei avainta. Esim. Microsoftin julkinen KMS-asiakasavain (GVLK) IoT Enterprise LTSC 2024:lle on KBN8V-HFGQ4-MGXVD-347P6-PDQGT. Se ei aktivoi mitaan, vain valitsee version. Ala kayta Evaluation-kuvan kanssa.",
+    "Tuoteavain": "",
+    "_AutomaattikirjautuminenPysyva": "false = automaattinen kirjautuminen poistetaan kun jalkiasennus valmistuu.",
+    "AutomaattikirjautuminenPysyva": false,
+    "_LopuksiSammutus": "true = kone sammuu (eika kaynnisty uudelleen) kun jalkiasennus on valmis. Kaytetaan automaattisessa paasta paahan -testissa; kotikaytossa false.",
+    "LopuksiSammutus": false,
+    "_LokiSarjaporttiin": "true = lokirivit myos sarjaporttiin COM1. Automaattista testia varten.",
+    "LokiSarjaporttiin": false
+  },
+
+  "Wlan": {
+    "_kuvaus": "Valinnainen. Jos kone on pelkan WLANin varassa, paivitykset tarvitsevat taman. Salasana on tikulla selvakielisena.",
+    "Ssid": "",
+    "Salasana": ""
+  },
+
+  "Paivitykset": {
+    "MaksimiKierrokset": 6,
+    "Ajurit": true,
+    "_VerkonOdotusMinuuttia": "Kauanko verkkoa odotetaan ennen kuin paivitykset ohitetaan.",
+    "VerkonOdotusMinuuttia": 10
+  },
+
+  "Sovellukset": {
+    "_Firefox": "true = asennetaan Firefox suoraan Mozillalta. Edge jaa joka tapauksessa (tietosuojakaytannoin).",
+    "Firefox": false,
+    "_VCRedist": "true = Microsoft Visual C++ -ajonaikaiset kirjastot (x64 + x86). Lahes kaikki pelit tarvitsevat naita.",
+    "VCRedist": true,
+    "_DirectX": "true = DirectX 9/10/11 -lisakirjastot (d3dx9, XAudio 2.7, XInput 1.3). Vanhemmat pelit tarvitsevat naita, eika Windows sisalla niita.",
+    "DirectX": true
+  },
+
+  "Suorituskyky": {
+    "_Virrankaytto": "auto = poytakone: Ultimate Performance, kannettava: Balanced + paras suorituskyky laturissa. Muut: ultimate, high, balanced.",
+    "Virrankaytto": "auto",
+    "_GpuAjoitus": "Laitteistokiihdytetty GPU-ajoitus (HAGS). Vaaditaan esim. DLSS Frame Generationiin. Ei vaikutusta jos ajuri ei tue.",
+    "GpuAjoitus": true,
+    "_IkkunoidutPelit": "Windows 11:n 'ikkunoitujen pelien optimoinnit': DX10/11-pelit ikkunassa flip-mallilla (pienempi viive, VRR toimii).",
+    "IkkunoidutPelit": true,
+    "_HorrostilaPois": "auto = pois poytakoneelta (vapauttaa RAM-muistin kokoisen tiedoston ja nopeuttaa sammutusta), paalle jaa kannettavassa. true/false pakottaa.",
+    "HorrostilaPois": "auto",
+    "_AktiivisetTunnit": "Windows Update ei kaynnista konetta uudelleen naiden tuntien valilla (0-23). Oletus 8-02: ei kesken pelin illalla.",
+    "AktiivisetTunnitAlku": 8,
+    "AktiivisetTunnitLoppu": 2
+  },
+
+  "Tietoturva": {
+    "_BitLocker": "true = C: salataan BitLockerilla (XTS-AES 128, TPM) ja palautusavain tallennetaan TIKULLE. Jos tikkua ei ole kiinni, salausta ei tehda, jottei avain katoa. Hidastaa NVMe:ta hieman. Automaattinen laitesalaus estetaan aina, koska paikallisella tililla sen avain katoaisi.",
+    "BitLocker": false
+  }
+}

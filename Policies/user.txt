@@ -1,0 +1,39 @@
+; ==============================================================
+;  iRequire: kayttajan ryhmakaytannot (LGPO.exe /t -muoto)
+;  Koskevat kaikkia koneen kayttajia.
+; ==============================================================
+
+User
+Software\Policies\Microsoft\Windows\Explorer
+DisableSearchBoxSuggestions
+DWORD:1
+
+User
+Software\Policies\Microsoft\Windows\WindowsCopilot
+TurnOffWindowsCopilot
+DWORD:1
+
+User
+Software\Policies\Microsoft\Windows\WindowsAI
+DisableAIDataAnalysis
+DWORD:1
+
+User
+Software\Policies\Microsoft\Windows\CloudContent
+DisableWindowsSpotlightFeatures
+DWORD:1
+
+User
+Software\Policies\Microsoft\Windows\CloudContent
+DisableTailoredExperiencesWithDiagnosticData
+DWORD:1
+
+User
+Software\Policies\Microsoft\Windows\CloudContent
+DisableThirdPartySuggestions
+DWORD:1
+
+User
+Software\Policies\Microsoft\Windows\CurrentVersion\PushNotifications
+NoToastApplicationNotificationOnLockScreen
+DWORD:1

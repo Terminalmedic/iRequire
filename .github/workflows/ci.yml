@@ -1,0 +1,29 @@
+name: CI
+
+# Ajetaan oikealla Windowsilla (PowerShell 5.1, sama kuin WinPE:ssa).
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Tarkistukset (Windows PowerShell 5.1)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: iRequire-tarkistukset
+        shell: powershell
+        run: .\Tests\Test-iRequire.ps1
+
+      - name: PSScriptAnalyzer
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -ExcludeRule PSAvoidUsingWriteHost, PSUseShouldProcessForStateChangingFunctions, PSUseSingularNouns, PSAvoidUsingEmptyCatchBlock, PSReviewUnusedParameter
+          if ($results) { $results | Format-Table -AutoSize | Out-String -Width 250 | Write-Host }
+          $errors = @($results | Where-Object { $_.Severity -eq 'Error' })
+          if ($errors.Count -gt 0) { throw "$($errors.Count) virhetason loydosta." }

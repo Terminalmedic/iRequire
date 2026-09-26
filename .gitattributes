@@ -1,0 +1,10 @@
+# Windows-tyokalut: sailyta CRLF-rivinvaihdot
+*.ps1 text eol=crlf
+*.psd1 text eol=crlf
+*.bat text eol=crlf
+# cmd.exe ja winpeshl odottavat Windows-rivinvaihtoja
+*.cmd text eol=crlf
+*.ini text eol=crlf
+*.xml text eol=crlf
+# Skriptit LF-rivinvaihdoin (bash)
+*.sh text eol=lf
