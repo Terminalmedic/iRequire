@@ -222,7 +222,7 @@ function Get-SecuritySummary {
     $lines = New-Object System.Collections.Generic.List[string]
     try {
         $mp = Get-MpComputerStatus -ErrorAction Stop
-        $lines.Add(('Defender: reaaliaikainen suojaus {0}, maaritykset {1}' -f $(if ($mp.RealTimeProtectionEnabled) { 'paalla' } else { 'POIS' }), $mp.AntivirusSignatureVersion))
+        $lines.Add(('Defender: reaaliaikainen suojaus {0}, maaritykset {1}, tila {2}' -f $(if ($mp.RealTimeProtectionEnabled) { 'paalla' } else { 'POIS' }), $mp.AntivirusSignatureVersion, $mp.AMRunningMode))
     } catch { $lines.Add('Defender: tilaa ei saatu') }
     try {
         $fw = @(Get-NetFirewallProfile -ErrorAction Stop | Where-Object { -not $_.Enabled })

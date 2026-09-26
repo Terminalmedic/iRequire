@@ -229,7 +229,13 @@ function Invoke-Native {
     $eap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $out = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" })
+        # stderr-rivi tulee ErrorRecordina, jonka TargetObject on itse rivi
+        # (tyhja rivi nakyisi muuten tekstina 'RemoteException').
+        $out = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) {
+                if ($_.TargetObject -is [string]) { $_.TargetObject } else { $_.Exception.Message }
+            } else { "$_" }
+        })
         $code = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $eap

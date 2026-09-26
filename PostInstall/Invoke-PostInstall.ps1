@@ -381,17 +381,27 @@ function Invoke-StageFinish {
     Disable-NetBios
     Write-Summary -State $State
     Remove-Item -LiteralPath (Join-Path $base 'ASENNUS-KESKEN.tag') -Force -ErrorAction SilentlyContinue
-    # Salasanat eivat saa jaada koneelle.
-    Remove-Item -LiteralPath (Join-Path $base 'Config\iRequire.json') -Force -ErrorAction SilentlyContinue
 
+    # Kirjoitussuojattu tikku (tai ISO) ei saa kaataa viimeistelya.
     $usb = Find-UsbStick
     if ($usb) {
         $dst = Join-Path $usb ("iRequire\Reports\{0}-{1}" -f $env:COMPUTERNAME, (Get-Date -Format 'yyyyMMdd-HHmmss'))
-        New-Item -ItemType Directory -Path $dst -Force | Out-Null
-        Copy-Item -Path (Join-Path $base 'Reports\*') -Destination $dst -Force -ErrorAction SilentlyContinue
-        Copy-Item -Path (Join-Path $base 'Logs\*.log') -Destination $dst -Force -ErrorAction SilentlyContinue
-        Write-IRequireLog "Raportit kopioitu tikulle: $dst" 'Ok'
+        try {
+            New-Item -ItemType Directory -Path $dst -Force | Out-Null
+            Copy-Item -Path (Join-Path $base 'Reports\*') -Destination $dst -Force -ErrorAction SilentlyContinue
+            Copy-Item -Path (Join-Path $base 'Logs\*.log') -Destination $dst -Force -ErrorAction SilentlyContinue
+            Write-IRequireLog "Raportit kopioitu tikulle: $dst" 'Ok'
+        } catch {
+            Write-IRequireLog ('Raportteja ei voitu kopioida tikulle: ' + $_.Exception.Message) 'Varoitus'
+        }
     }
+}
+
+function Remove-Secrets {
+    <# Salasanat eivat saa jaada koneelle. Kutsutaan vasta kun tilakone on
+       paassa: jos viimeistely kaatuu ja yritetaan uudelleen, uusintakierros
+       tarvitsee samat asetukset (muuten se ajettaisiin oletuksilla). #>
+    Remove-Item -LiteralPath (Join-Path $base 'Config\iRequire.json') -Force -ErrorAction SilentlyContinue
 }
 
 # ==============================================================
@@ -429,6 +439,7 @@ try {
     switch ($result.Result) {
         'Reboot' { Restart-ForStage $state $result.Reason }
         default {
+            Remove-Secrets
             # Tehtavat poistetaan vasta seuraavalla kaynnistyksella, kun
             # kayttajan istunto on ehtinyt asettaa naytot (ks. alku).
             Write-IRequireLog ('Jalkiasennus paattyi: ' + $result.Reason) 'Ok'

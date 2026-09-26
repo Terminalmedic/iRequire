@@ -142,6 +142,8 @@ for dir in /Windows/System32/config /Windows/Panther /iRequire /iRequire/Config;
     name=$(echo "$dir" | tr '/' '_')
     virt-ls -a nvme.qcow2 "$dir" > "out/ls$name.txt" 2>>out/guestfs.err || echo "__LUKUVIRHE__" > "out/ls$name.txt"
 done
+# Heti ajon lokiin: artefakteja ei aina voi ladata, ja myohempi vaihe voi kaatua.
+if [ -f out/Reports/yhteenveto.txt ]; then echo '----- yhteenveto.txt -----'; tr -d '\r' < out/Reports/yhteenveto.txt; fi
 
 scan_disk() {
     # Tulostaa: luetut_tavut levyn_koko osumat
@@ -173,7 +175,8 @@ check 'Selvakielinen unattend.xml poistettu' "! grep -q '__LUKUVIRHE__' out/ls_W
 check 'Asetustiedosto (salasanat) poistettu' "! grep -q '__LUKUVIRHE__' out/ls_iRequire_Config.txt && ! grep -q 'iRequire.json' out/ls_iRequire_Config.txt"
 
 # Rekisteri luetaan suoraan levylta: tulivatko kaytannot ja viritykset voimaan?
-reg() { virt-win-reg nvme.qcow2 "$1" 2>/dev/null | tr -d '\r'; }
+# Puuttuva avain ei saa kaataa skriptia (set -e + pipefail): tarkistus kertoo.
+reg() { virt-win-reg nvme.qcow2 "$1" 2>/dev/null | tr -d '\r' || true; }
 reg 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' > out/reg-telemetria.txt
 reg 'HKLM\SYSTEM\CurrentControlSet\Control\CI\Config' > out/reg-ci.txt
 reg 'HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules' > out/reg-asr.txt
@@ -192,7 +195,6 @@ for d in sata nvme; do
     check "Salaista dataa ei loydy levylta ($d)" "[ '$hits' = '0' ]"
 done
 
-if [ -f out/Reports/yhteenveto.txt ]; then echo '----- yhteenveto.txt -----'; cat out/Reports/yhteenveto.txt; fi
 
 # --- 5. Diagnostiikka ajon lokiin (artefaktit eivat aina ole saatavilla) ---
 if [ "$fail" -ne 0 ]; then

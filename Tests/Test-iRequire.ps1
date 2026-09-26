@@ -67,6 +67,28 @@ Test-Case 'Ulkoinen ohjelma: stderr ei kaada, paluukoodi talteen (Invoke-Native)
     Assert-True ($ErrorActionPreference -eq 'Stop') 'ErrorActionPreference ei palautunut'
     $r = Invoke-Native $exe $(if ($env:OS -eq 'Windows_NT') { @('/c', 'exit /b 0') } else { @('-c', 'exit 0') })
     Assert-True ($r.ExitCode -eq 0) "onnistunut ajo: $($r.ExitCode)"
+    # Tyhja stderr-rivi (LGPO tulostaa niita) ei saa nakya lokissa virhetyyppina.
+    $r = Invoke-Native $exe $(if ($env:OS -eq 'Windows_NT') { @('/c', 'echo.1>&2& echo virhe 1>&2') } else { @('-c', 'echo >&2; echo virhe >&2') })
+    Assert-True (-not (($r.Output -join '|') -match 'Exception')) ('tuloste: ' + ($r.Output -join '|'))
+    Assert-True (($r.Output -join '|') -match 'virhe') ('tuloste: ' + ($r.Output -join '|'))
+}
+
+Test-Case 'Jalkiasennus: salasanat poistetaan vasta kun tilakone on paassa' {
+    # Viimeistely kaatui kerran (kirjoitussuojattu tikku) ja uusintakierros
+    # ajettiin oletusasetuksilla, koska asetustiedosto oli jo poistettu.
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'PostInstall\Invoke-PostInstall.ps1'), [ref]$null, [ref]$null)
+    $fns = @{}
+    foreach ($f in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) { $fns[$f.Name] = $f.Extent.Text }
+    Assert-True ($fns.ContainsKey('Remove-Secrets') -and $fns['Remove-Secrets'] -match 'iRequire\.json') 'Remove-Secrets puuttuu'
+    foreach ($n in $fns.Keys) {
+        if ($n -ne 'Remove-Secrets') { Assert-True ($fns[$n] -notmatch 'iRequire\.json') "$n poistaa asetustiedoston" }
+    }
+    $text = $ast.Extent.Text
+    $machine = $text.IndexOf('$result = Invoke-StageMachine')
+    $call = $text.LastIndexOf('Remove-Secrets')
+    Assert-True ($machine -gt 0 -and $call -gt $machine) 'Remove-Secrets kutsutaan ennen tilakoneen loppua'
+    $finish = $fns['Invoke-StageFinish']
+    Assert-True ($finish -match 'catch') 'tikulle kopiointi ei ole virhesuojattu'
 }
 
 Test-Case 'Ulkoisia ohjelmia ei ajeta suoraan 2>&1:lla (vain Invoke-Native)' {
