@@ -27,7 +27,13 @@ param(
     [string[]]$Edition = @('*IoT Enterprise LTSC*', '*Enterprise LTSC*', '*Pro'),
     [string]$AdkRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\Assessment and Deployment Kit",
     [switch]$SkipLgpoDownload,
-    [switch]$SkipNetFx3
+    [switch]$SkipNetFx3,
+    # Secure Bootin allekirjoitusvarmenne tikun kaynnistystiedostoille (KB5025885).
+    # 2011: toimii lahes kaikissa koneissa, mutta EI koneissa joissa vanhat
+    #       kaynnistyksenhallinnat on mitatoity (BlackLotus-korjaus, vaihe 3).
+    # 2023: toimii mitatoidyissa ja uusissa 2023-koneissa, mutta ei koneissa
+    #       joiden laiteohjelmisto ei viela luota 'Windows UEFI CA 2023' -varmenteeseen.
+    [ValidateSet('2011', '2023')][string]$SecureBootCA = '2011'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -203,6 +209,13 @@ try {
     if (Get-ChildItem -LiteralPath $peDrivers -Recurse -Filter *.inf -ErrorAction SilentlyContinue | Select-Object -First 1) {
         Write-IRequireLog '  WinPE-ajurit: Build\Drivers\WinPE'
         Add-WindowsDriver -Path $mount -Driver $peDrivers -Recurse | Out-Null
+    }
+
+    if ($SecureBootCA -eq '2023') {
+        Write-IRequireLog '  kaynnistystiedostot: Windows UEFI CA 2023'
+        . (Join-Path $repo 'Lib\Media.ps1')
+        $isoEfi = Copy-Ca2023BootFiles -BootRoot $mount -MediaRoot $media
+        Write-IRequireLog "  ISOn EFI-kuva: $isoEfi"
     }
 
     $sys32 = Join-Path $mount 'Windows\System32'

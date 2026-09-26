@@ -173,8 +173,20 @@ function Copy-Payload {
 function Set-BootFiles {
     param([Parameter(Mandatory)][string]$Windows, [Parameter(Mandatory)][string]$System, [Parameter(Mandatory)][string]$Firmware)
     $fwArg = if ($Firmware -eq 'UEFI') { 'UEFI' } else { 'BIOS' }
-    & bcdboot.exe "$Windows\Windows" /s $System /f $fwArg
-    if ($LASTEXITCODE -ne 0) { throw "bcdboot epaonnistui (koodi $LASTEXITCODE)" }
+    $bcdArgs = @("$Windows\Windows", '/s', $System, '/f', $fwArg)
+    if ($Firmware -eq 'UEFI') {
+        # /bootex: 'Windows UEFI CA 2023' -allekirjoitettu kaynnistyksenhallinta,
+        # jos laiteohjelmisto luottaa siihen (bcdboot paattaa itse). Muuten
+        # asennettu Windows ei kaynnistyisi koneessa, jossa vanhat on mitatoity
+        # (KB5025885). Jos lippua ei tueta, tavallinen tapa.
+        $r = Invoke-Native bcdboot.exe ($bcdArgs + '/bootex')
+        $r.Output | ForEach-Object { Write-IRequireLog ("bcdboot: " + $_) }
+        if ($r.ExitCode -eq 0) { Set-InternalBootFirst; return }
+        Write-IRequireLog ("bcdboot /bootex epaonnistui (koodi {0}), tavallinen kaynnistystiedostojen asennus" -f $r.ExitCode) 'Varoitus'
+    }
+    $r = Invoke-Native bcdboot.exe $bcdArgs
+    $r.Output | ForEach-Object { Write-IRequireLog ("bcdboot: " + $_) }
+    if ($r.ExitCode -ne 0) { throw "bcdboot epaonnistui (koodi $($r.ExitCode))" }
     if ($Firmware -eq 'UEFI') { Set-InternalBootFirst }
 }
 

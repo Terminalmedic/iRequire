@@ -29,12 +29,13 @@ if (-not (Test-Path -LiteralPath (Join-Path $MediaDir 'iRequire\iRequire.tag')))
 $oscdimg = Join-Path $AdkRoot 'Deployment Tools\amd64\Oscdimg\oscdimg.exe'
 if (-not (Test-Path -LiteralPath $oscdimg)) { throw "oscdimg.exe puuttuu: $oscdimg (Windows ADK: Deployment Tools)" }
 
+. (Join-Path $PSScriptRoot '..\Lib\Media.ps1')
 $etfs = Join-Path $MediaDir 'boot\etfsboot.com'
-$efi = Join-Path $MediaDir 'efi\microsoft\boot\efisys_noprompt.bin'
-if (-not (Test-Path -LiteralPath $efi)) {
-    $efi = Join-Path $AdkRoot 'Deployment Tools\amd64\Oscdimg\efisys_noprompt.bin'
-}
-foreach ($f in @($etfs, $efi)) { if (-not (Test-Path -LiteralPath $f)) { throw "Puuttuu: $f" } }
+if (-not (Test-Path -LiteralPath $etfs)) { throw "Puuttuu: $etfs" }
+$img = Get-IsoEfiBootImage -MediaRoot $MediaDir -OscdimgDir (Join-Path $AdkRoot 'Deployment Tools\amd64\Oscdimg')
+$efi = $img.Path
+Write-Host ("EFI-kaynnistyskuva: {0} ({1})" -f $efi, $(if ($img.Ca2023) { 'Windows UEFI CA 2023' } else { 'Windows UEFI CA 2011' }))
+if (-not $img.NoPrompt) { Write-Warning 'ISO kysyy nappainta ennen kaynnistysta (noprompt-kuvaa ei loytynyt).' }
 
 $bootData = '2#p0,e,b{0}#pEF,e,b{1}' -f $etfs, $efi
 & $oscdimg -m -o -u2 -udfver102 -lIREQUIRE "-bootdata:$bootData" $MediaDir $IsoPath

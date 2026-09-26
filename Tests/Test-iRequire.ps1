@@ -123,7 +123,8 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
         'Start-VM','Stop-Service','Unregister-ScheduledTask','Update-MpSignature','Update-Disk',
         'Enable-WindowsOptionalFeature','Get-Tpm','Get-BitLockerVolume','Add-BitLockerKeyProtector',
         'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-MpPreference','Get-NetFirewallProfile',
-        'Confirm-SecureBootUEFI','Set-CimInstance','Get-WindowsPackage')
+        'Confirm-SecureBootUEFI','Set-CimInstance','Get-WindowsPackage',
+        'Invoke-ScriptAnalyzer')   # Tests\Invoke-Checks.ps1, vain jos moduuli on asennettu
     $defined = @{}
     $calls = @{}
     foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.ps1)) {
@@ -681,6 +682,63 @@ Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScree
     $d = Get-Content -LiteralPath (Join-Path $root 'Policies\Debloat.json') -Raw | ConvertFrom-Json
     foreach ($svc in @('WinDefend', 'mpssvc', 'SecurityHealthService', 'wscsvc', 'Sense', 'WdNisSvc')) {
         Assert-True ($d.Palvelut -notcontains $svc) "Tietoturvapalvelu $svc poistolistalla"
+    }
+}
+
+Test-Case 'Secure Boot 2023: kaynnistystiedostot vaihdetaan kuten Microsoftin skriptissa' {
+    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('irq-ca2023-' + [guid]::NewGuid().ToString('N'))
+    try {
+        $bootRoot = Join-Path $tmp 'mount'; $media = Join-Path $tmp 'media'
+        $b = Join-Path $bootRoot 'Windows\Boot'
+        New-Item -ItemType Directory -Path (Join-Path $b 'EFI_EX'), (Join-Path $b 'FONTS_EX'), (Join-Path $b 'DVD_EX\EFI\en-US'), (Join-Path $media 'efi\boot') -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $b 'EFI_EX\bootmgfw_EX.efi') -Value 'uusi-2023'
+        Set-Content -LiteralPath (Join-Path $b 'EFI_EX\bootmgr_EX.efi') -Value 'bootmgr-2023'
+        Set-Content -LiteralPath (Join-Path $b 'FONTS_EX\segmono_boot_EX.ttf') -Value 'fontti'
+        Set-Content -LiteralPath (Join-Path $b 'DVD_EX\EFI\en-US\efisys_EX.bin') -Value 'efisys'
+        Set-Content -LiteralPath (Join-Path $media 'efi\boot\bootx64.efi') -Value 'vanha-2011'
+
+        $img = Copy-Ca2023BootFiles -BootRoot $bootRoot -MediaRoot $media
+        Assert-True ((Get-Content -LiteralPath (Join-Path $media 'efi\boot\bootx64.efi')) -eq 'uusi-2023') 'bootx64.efi ei vaihtunut'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $media 'bootmgr.efi')) -eq 'bootmgr-2023') 'bootmgr.efi puuttuu'
+        Assert-True (Test-Path -LiteralPath (Join-Path $media 'efi\microsoft\boot\fonts\segmono_boot.ttf')) 'fontti ilman _EX-paatetta puuttuu'
+        Assert-True ($img -like '*efisys_ex.bin') "ISO-kuva: $img"
+        # ISO: 2023-mediaan ei koskaan 2011-kuvaa, vaikka ADK:ssa olisi 2011 noprompt.
+        $adk = Join-Path $tmp 'adk'; New-Item -ItemType Directory -Path $adk -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $adk 'efisys_noprompt.bin') -Value 'x'
+        $sel = Get-IsoEfiBootImage -MediaRoot $media -OscdimgDir $adk
+        Assert-True ($sel.Ca2023 -and $sel.Path -like '*efisys_ex.bin' -and -not $sel.NoPrompt) "2023-valinta: $($sel.Path)"
+        Set-Content -LiteralPath (Join-Path $adk 'efisys_noprompt_ex.bin') -Value 'x'
+        $sel = Get-IsoEfiBootImage -MediaRoot $media -OscdimgDir $adk
+        Assert-True ($sel.NoPrompt -and $sel.Path -like '*noprompt_ex.bin') "2023 noprompt ADK:sta: $($sel.Path)"
+        # 2011-media: noprompt ADK:sta
+        $m2 = Join-Path $tmp 'media2011'; New-Item -ItemType Directory -Path (Join-Path $m2 'efi\microsoft\boot') -Force | Out-Null
+        $sel = Get-IsoEfiBootImage -MediaRoot $m2 -OscdimgDir $adk
+        Assert-True (-not $sel.Ca2023 -and $sel.Path -like '*efisys_noprompt.bin') "2011-valinta: $($sel.Path)"
+        # Puuttuvat _EX-tiedostot: selva virhe, ei puolivalmista mediaa.
+        Remove-Item -LiteralPath (Join-Path $b 'FONTS_EX') -Recurse -Force
+        $threw = $false; try { Copy-Ca2023BootFiles -BootRoot $bootRoot -MediaRoot $media | Out-Null } catch { $threw = $true }
+        Assert-True $threw 'puuttuva FONTS_EX ei kaatanut'
+    } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Test-Case 'Asennus: bcdboot kokeilee ensin /bootex, varalla tavallinen' {
+    $script:bcdCalls = New-Object System.Collections.Generic.List[string]
+    $script:bcdFailBootex = $false
+    function script:bcdboot.exe { $script:bcdCalls.Add(($args -join ' ')); $global:LASTEXITCODE = $(if ($script:bcdFailBootex -and ($args -contains '/bootex')) { 87 } else { 0 }) }
+    function script:Set-InternalBootFirst { }
+    try {
+        Set-BootFiles -Windows 'W:' -System 'S:' -Firmware 'UEFI'
+        Assert-True ($script:bcdCalls.Count -eq 1 -and $script:bcdCalls[0] -match '/f UEFI /bootex$') ('UEFI: ' + ($script:bcdCalls -join ' | '))
+        $script:bcdCalls.Clear(); $script:bcdFailBootex = $true
+        Set-BootFiles -Windows 'W:' -System 'S:' -Firmware 'UEFI'
+        Assert-True ($script:bcdCalls.Count -eq 2 -and $script:bcdCalls[1] -notmatch 'bootex') ('varalla: ' + ($script:bcdCalls -join ' | '))
+        $script:bcdCalls.Clear()
+        Set-BootFiles -Windows 'W:' -System 'S:' -Firmware 'BIOS'
+        Assert-True ($script:bcdCalls.Count -eq 1 -and $script:bcdCalls[0] -notmatch 'bootex' -and $script:bcdCalls[0] -match '/f BIOS') ('BIOS: ' + ($script:bcdCalls -join ' | '))
+    } finally {
+        Remove-Item -Path Function:\bcdboot.exe -ErrorAction SilentlyContinue
+        Remove-Item -Path Function:\Set-InternalBootFirst -ErrorAction SilentlyContinue
+        . (Join-Path $root 'WinPE\Deploy.ps1')
     }
 }
 

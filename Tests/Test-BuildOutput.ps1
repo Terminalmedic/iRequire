@@ -50,6 +50,17 @@ Check 'iRequire-kansio, merkki ja eheysmanifesti' {
     Assert-True ($problems.Count -eq 0) ('manifesti: ' + ($problems -join '; '))
 }
 
+Check 'Kaynnistystiedostojen Secure Boot -varmenne (KB5025885)' {
+    $ca2023 = Test-Path -LiteralPath (Join-Path $MediaDir 'efi\microsoft\boot\efisys_ex.bin')
+    $expect = if ($ca2023) { 'Windows UEFI CA 2023' } else { 'Microsoft Windows Production PCA 2011' }
+    foreach ($f in @('efi\boot\bootx64.efi')) {
+        $sig = Get-AuthenticodeSignature -FilePath (Join-Path $MediaDir $f)
+        Assert-True ($null -ne $sig.SignerCertificate) "$f ei ole allekirjoitettu"
+        Assert-True ($sig.SignerCertificate.Issuer -match [regex]::Escape($expect)) ("{0}: myontaja '{1}', odotettiin '{2}'" -f $f, $sig.SignerCertificate.Issuer, $expect)
+    }
+    Write-Host ("          {0}" -f $expect) -ForegroundColor DarkGray
+}
+
 Check 'Ei asennusohjelman omia vastaustiedostoja' {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $MediaDir 'autounattend.xml'))) 'autounattend.xml juuressa'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $MediaDir 'sources\ei.cfg'))) 'ei.cfg jai'

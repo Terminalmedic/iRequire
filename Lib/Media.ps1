@@ -96,3 +96,59 @@ function Test-MediaManifest {
     }
     return ,$problems
 }
+
+function Copy-Ca2023BootFiles {
+    <# Vaihtaa median kaynnistystiedostot 'Windows UEFI CA 2023' -allekirjoitettuihin
+       (KB5025885, CVE-2023-24932). Sama tiedostojen vaihto kuin Microsoftin
+       Make2023BootableMedia.ps1:ssa (KB5053484). Lahteena liitetty boot.wim,
+       jossa on 2024-4B tai uudempi paivitys (Windows\Boot\*_EX).
+       Palauttaa ISOn EFI-kaynnistyskuvan polun (noprompt jos saatavilla). #>
+    param(
+        [Parameter(Mandatory)][string]$BootRoot,
+        [Parameter(Mandatory)][string]$MediaRoot
+    )
+    $boot = Join-Path $BootRoot 'Windows\Boot'
+    $ex = Join-Path $boot 'EFI_EX'
+    $fonts = Join-Path $boot 'FONTS_EX'
+    $dvd = Join-Path $boot 'DVD_EX\EFI\en-US'
+    foreach ($p in @($ex, $fonts, $dvd)) {
+        if (-not (Test-Path -LiteralPath $p)) { throw "boot.wim:sta puuttuu $p (tarvitaan 2024-4B tai uudempi paivitys)" }
+    }
+    $efiBoot = Join-Path $MediaRoot 'efi\boot'
+    $msBoot = Join-Path $MediaRoot 'efi\microsoft\boot'
+    New-Item -ItemType Directory -Path $efiBoot, (Join-Path $msBoot 'fonts') -Force | Out-Null
+
+    Copy-Item -LiteralPath (Join-Path $ex 'bootmgfw_EX.efi') -Destination (Join-Path $efiBoot 'bootx64.efi') -Force
+    $bootmgr = Join-Path $ex 'bootmgr_EX.efi'
+    if (Test-Path -LiteralPath $bootmgr) { Copy-Item -LiteralPath $bootmgr -Destination (Join-Path $MediaRoot 'bootmgr.efi') -Force }
+    foreach ($f in @(Get-ChildItem -LiteralPath $fonts -File | Where-Object { $_.Name -like '*_EX.ttf' })) {
+        Copy-Item -LiteralPath $f.FullName -Destination (Join-Path (Join-Path $msBoot 'fonts') ($f.Name -replace '_EX', '')) -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $dvd 'efisys_EX.bin') -Destination (Join-Path $msBoot 'efisys_ex.bin') -Force
+    $noprompt = Join-Path $dvd 'efisys_noprompt_EX.bin'
+    if (Test-Path -LiteralPath $noprompt) {
+        Copy-Item -LiteralPath $noprompt -Destination (Join-Path $msBoot 'efisys_noprompt_ex.bin') -Force
+        return (Join-Path $msBoot 'efisys_noprompt_ex.bin')
+    }
+    return (Join-Path $msBoot 'efisys_ex.bin')
+}
+
+function Get-IsoEfiBootImage {
+    <# Valitsee ISOn EFI-kaynnistyskuvan. 2023-mediaan ei saa kayttaa 2011-kuvaa,
+       koska kuva sisaltaa oman kaynnistyksenhallintansa. Noprompt ensin:
+       muuten ISO jaa odottamaan nappainta ("Press any key to boot from CD"). #>
+    param([Parameter(Mandatory)][string]$MediaRoot, [string]$OscdimgDir = '')
+    $ms = Join-Path $MediaRoot 'efi\microsoft\boot'
+    $is2023 = Test-Path -LiteralPath (Join-Path $ms 'efisys_ex.bin')
+    $names = if ($is2023) { @('efisys_noprompt_ex.bin', 'efisys_ex.bin') } else { @('efisys_noprompt.bin', 'efisys.bin') }
+    foreach ($n in $names) {
+        foreach ($dir in @($ms, $OscdimgDir)) {
+            if (-not $dir) { continue }
+            $p = Join-Path $dir $n
+            if (Test-Path -LiteralPath $p) {
+                return [pscustomobject]@{ Path = $p; Ca2023 = $is2023; NoPrompt = ($n -like '*noprompt*') }
+            }
+        }
+    }
+    throw "EFI-kaynnistyskuvaa ei loydy ($($names -join ', '))"
+}

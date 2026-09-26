@@ -59,6 +59,17 @@ Get-Disk | Where-Object BusType -eq USB
 .\Build\New-iRequireIso.ps1
 ```
 
+### Secure Boot -varmenne: 2011 vai 2023
+
+Microsoft vaihtaa Secure Bootin varmenteita (vanhat vanhenevat 2026) ja mitätöi vanhoja käynnistyksenhallintoja BlackLotus-haavoittuvuuden vuoksi ([KB5025885](https://support.microsoft.com/topic/41a975df-beb2-40c1-99a3-b3ff139f832d)). Tikku voidaan rakentaa kummalla tahansa:
+
+| | `-SecureBootCA 2011` (oletus) | `-SecureBootCA 2023` |
+|---|---|---|
+| Useimmat koneet | käynnistyy | käynnistyy, jos laiteohjelmisto on päivitetty luottamaan 2023-varmenteeseen |
+| Kone, jossa vanhat on mitätöity | **ei käynnisty** ("Secure Boot violation") | käynnistyy |
+
+Jos tikku ei käynnisty ja näyttää Secure Boot -virheen, rakenna se uudelleen parametrilla `-SecureBootCA 2023`. Asennettu Windows saa aina uusimman käynnistyksenhallinnan, johon kone luottaa (`bcdboot /bootex`), joten tämä valinta koskee vain tikkua.
+
 Tikun sisältö on tavallisia tiedostoja. Asetukset (`iRequire\Config\iRequire.json`) ja konekohtaiset ajurit (`iRequire\Drivers`) voi muokata suoraan tikulle ilman uudelleenrakennusta. Muita tiedostoja ei voi muokata, koska eheystarkistus hylkää muuttuneen tiedoston.
 
 ## Asetukset
