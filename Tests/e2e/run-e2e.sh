@@ -50,6 +50,12 @@ log "Luodaan levyt (NVMe 48 Gt kohde, SATA 16 Gt data)"
 seed_disk nvme 48
 seed_disk sata 16
 
+# Ulkoinen USB-levy "IRQLOKI": WinPE kirjoittaa lokinsa sille (ISO on vain
+# luku), joten syy nakyy vaikka kone pysahtyisi. Samalla testataan, etta
+# ulkoiseen USB-levyyn ei kosketa: merkkitiedoston pitaa sailya.
+rm -f loki.img; truncate -s 64M loki.img; mkfs.vfat -n IRQLOKI loki.img >/dev/null
+echo "$SECRET-USB" > usb-merkki.txt; mcopy -i loki.img usb-merkki.txt ::/usb-merkki.txt
+
 # Kuten oikea pelikone: Secure Boot paalla Microsoftin avaimilla ja TPM 2.0.
 # Nain testataan myos etta tikku kaynnistyy Secure Bootin kanssa.
 OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.secboot.fd
@@ -81,6 +87,9 @@ qemu-system-x86_64 \
     -device ide-hd,drive=sata,bus=ahci.0,serial=IREQSATA0001 \
     -drive file=iso.iso,if=none,id=cd,media=cdrom,readonly=on \
     -device ide-cd,drive=cd,bus=ahci.1 \
+    -device qemu-xhci,id=xhci \
+    -drive file=loki.img,if=none,id=loki,format=raw \
+    -device usb-storage,bus=xhci.0,drive=loki,serial=IREQLOKI0001 \
     -netdev user,id=n0 -device e1000e,netdev=n0,romfile= \
     -vga std -display none \
     -monitor unix:mon.sock,server,nowait \
@@ -150,6 +159,9 @@ check() { if eval "$2"; then log "OK    $1"; else log "VIRHE $1"; fail=1; fi; }
 export LIBGUESTFS_BACKEND=direct
 
 log "Luetaan tulokset levylta (libguestfs)"
+mkdir -p out/loki; mcopy -s -n -i loki.img ::/iRequire out/loki/ 2>/dev/null || true
+check 'Ulkoinen USB-levy koskematon (merkkitiedosto sailyi)' "mtype -i loki.img ::/usb-merkki.txt 2>/dev/null | grep -q '$SECRET-USB'"
+check 'WinPE:n loki tallentui lokitikulle' "ls out/loki/iRequire/Reports/*/winpe.log >/dev/null 2>&1"
 virt-copy-out -a nvme.qcow2 /iRequire/Logs /iRequire/Reports out/ 2>out/guestfs.err || log "kopiointi epaonnistui: $(tail -3 out/guestfs.err)"
 for dir in /Windows/System32/config /Windows/Panther /iRequire /iRequire/Config; do
     name=$(echo "$dir" | tr '/' '_')
@@ -238,7 +250,21 @@ done
 
 # --- 5. Diagnostiikka ajon lokiin (artefaktit eivat aina ole saatavilla) ---
 if [ "$fail" -ne 0 ]; then
+    # Diagnostiikka ei saa kaatua (set -e + pipefail): jokainen komento || true.
+    set +e +o pipefail
     echo '===== DIAGNOSTIIKKA ====='
+    # Ensin nayton teksti: jos WinPE pysahtyi, syy on ruudulla eika levylla ole mitaan.
+    echo '----- Nayton teksti (OCR, viimeiset kuvakaappaukset) -----'
+    for png in $(ls shots/*.png 2>/dev/null | tail -n 3); do
+        echo ">> $png"
+        convert "$png" -negate -resize 200% -threshold 50% /tmp/ocr.png 2>/dev/null && tesseract /tmp/ocr.png - 2>/dev/null | grep -v '^\s*$' | head -60
+    done
+    for f in out/loki/iRequire/Reports/*/winpe.log; do
+        [ -f "$f" ] || continue
+        echo "----- $f (lokitikku, viimeiset 80 rivia) -----"; tail -n 80 "$f" | tr -d '\r'
+    done
+    echo '----- Sarjaporttiloki (viimeiset 80 rivia) -----'
+    tail -n 80 out/serial.log 2>/dev/null | tr -d '\r'
     for f in out/Reports/*.log out/Logs/*.log out/Logs/*.json; do
         [ -f "$f" ] || continue
         echo "----- $f (viimeiset 60 rivia) -----"; tail -n 60 "$f" | tr -d '\r'
@@ -253,11 +279,7 @@ if [ "$fail" -ne 0 ]; then
         echo "----- $f (viimeiset 40 rivia) -----"
         virt-cat -a nvme.qcow2 "$f" 2>/dev/null | tr -d '\r' | tail -n 40
     done
-    echo '----- Nayton teksti (OCR, viimeiset kuvakaappaukset) -----'
-    for png in $(ls shots/*.png 2>/dev/null | tail -n 2); do
-        echo ">> $png"
-        convert "$png" -negate -resize 200% -threshold 50% /tmp/ocr.png 2>/dev/null && tesseract /tmp/ocr.png - 2>/dev/null | grep -v '^\s*$' | head -40
-    done
+    set -e -o pipefail
 fi
 for f in out/Reports/tyhjennystodistus-*.txt; do [ -f "$f" ] && { echo "----- $(basename "$f") -----"; cat "$f"; }; done
 

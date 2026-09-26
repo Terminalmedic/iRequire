@@ -237,7 +237,7 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 - **Salasanat:** `Windows\Panther\unattend.xml` poistetaan heti, asetustiedosto lukitaan vain järjestelmänvalvojille ja poistetaan lopuksi, ja automaattinen kirjautuminen poistetaan salasanoineen (myös LSA-salaisuus `DefaultPassword`, jota pelkkä rekisteriarvon poisto ei poista).
 - **Jälkiasennuksen skriptit:** SYSTEM ajaa ne kansiosta `C:\iRequire`, joka lukitaan: käyttäjät saavat vain lukea. Muuten C:n juureen luotu kansio perisi kaikille muokkausoikeuden, ja tavallisin oikeuksin ajettu haittaohjelma voisi saada SYSTEM-oikeudet.
 - **Harjoitustila** pysähtyy ennen yhtäkään levylle kirjoittavaa kutsua; rakennetesti valvoo järjestystä.
-- **Kirjoitussuojattu tikku tai ISO:** raportit tallennetaan asennettavalle koneelle.
+- **Kirjoitussuojattu tikku tai ISO** (esim. Ventoy): raportit tallennetaan asennettavalle koneelle. Jos koneessa on lisäksi USB-tikku nimeltä `IRQLOKI`, WinPE:n loki ja tyhjennystodistus tallentuvat myös sille, jolloin ne säilyvät vaikka kone pysähtyisi. USB-levyihin ei koskaan kosketa.
 
 ## Vianetsintä
 

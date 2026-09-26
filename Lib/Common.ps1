@@ -18,6 +18,16 @@ function Enable-SerialLog {
         $script:SerialPort = $p
     } catch {
         $script:SerialPort = $null
+        # WinPE:ssa System.IO.Ports ei toimi. Varalla cmd: rivi tiedostoon ja
+        # "type tiedosto > COM1" (tiedoston kautta lokirivin merkit eivat
+        # sotke cmd:n komentoa). Vain testiasetuksella, joten hitaus ei haittaa.
+        try {
+            $script:SerialTemp = Join-Path $env:TEMP 'irequire-serial.txt'
+            & cmd.exe /c 'mode COM1 BAUD=115200 PARITY=n DATA=8 STOP=1 >nul 2>&1'
+            Set-Content -LiteralPath $script:SerialTemp -Value 'iRequire: sarjaportti (cmd)' -Encoding ASCII
+            & cmd.exe /c ('type "{0}" > COM1' -f $script:SerialTemp)
+            $script:SerialCmd = ($LASTEXITCODE -eq 0)
+        } catch { $script:SerialCmd = $false }
     }
 }
 
@@ -44,7 +54,23 @@ function Write-IRequireLog {
     }
     if ($script:SerialPort) {
         try { $script:SerialPort.WriteLine($line) } catch { }
+    } elseif ($script:SerialCmd) {
+        try {
+            Set-Content -LiteralPath $script:SerialTemp -Value $line -Encoding ASCII
+            & cmd.exe /c ('type "{0}" > COM1' -f $script:SerialTemp)
+        } catch { }
     }
+}
+
+function Find-LogVolume {
+    <# Erillinen lokitikku (nimi IRQLOKI): jos iRequire-tikku on kirjoitus-
+       suojattu (ISO, Ventoy), WinPE:n loki tallentuu sille eika katoa,
+       vaikka kone pysahtyisi. USB-levyja ei koskaan tyhjenneta. #>
+    try {
+        $v = @(Get-Volume -ErrorAction Stop | Where-Object { $_.FileSystemLabel -eq 'IRQLOKI' -and $_.DriveLetter }) | Select-Object -First 1
+        if ($v) { return ('{0}:' -f $v.DriveLetter) }
+    } catch { }
+    return $null
 }
 
 function Get-WritableDirectory {

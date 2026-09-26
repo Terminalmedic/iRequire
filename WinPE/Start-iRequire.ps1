@@ -27,7 +27,11 @@ $base = Join-Path $UsbRoot 'iRequire'
 . (Join-Path $base 'WinPE\Deploy.ps1')
 
 $runId = Get-Date -Format 'yyyyMMdd-HHmmss'
-$reportDir = Get-WritableDirectory -Candidates @((Join-Path $base "Reports\$runId"), (Join-Path $env:SystemDrive "iRequire\Reports\$runId"))
+$logVolume = Find-LogVolume
+$candidates = @((Join-Path $base "Reports\$runId"))
+if ($logVolume) { $candidates += (Join-Path $logVolume "iRequire\Reports\$runId") }
+$candidates += (Join-Path $env:SystemDrive "iRequire\Reports\$runId")
+$reportDir = Get-WritableDirectory -Candidates $candidates
 Start-Log -Path (Join-Path $reportDir 'winpe.log')
 if ($reportDir -notlike "$UsbRoot*") { Write-IRequireLog 'Tikulle ei voi kirjoittaa (kirjoitussuojattu tai ISO): raportit tallennetaan vain asennettavalle koneelle' 'Varoitus' }
 $configPath = Join-Path $base 'Config\iRequire.json'
