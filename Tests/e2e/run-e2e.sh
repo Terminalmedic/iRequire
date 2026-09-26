@@ -2,7 +2,7 @@
 # ==============================================================
 #  iRequire - paasta paahan -testi QEMU/KVM-virtuaalikoneessa
 #
-#  1. Testiasetukset ISOon (lyhyt laskuri, sammutus lopuksi)
+#  1. ISO jossa testiasetukset (tehty Windows-ajossa)
 #  2. Kaksi levya taynna "salaista" dataa: NVMe (kohde) ja SATA
 #  3. Kone kaynnistyy ISOlta UEFI:lla ja koko ketju ajetaan ilman
 #     ihmista: WinPE -> tyhjennys -> asennus -> OOBE -> jalkiasennus
@@ -18,36 +18,17 @@ set -euo pipefail
 ISO_IN="$1"
 WORK="$2"
 TIMEOUT_MIN="${E2E_TIMEOUT_MIN:-210}"
-UPDATE_ROUNDS="${E2E_UPDATE_ROUNDS:-0}"
 SECRET="IREQUIRE-SALAINEN-TESTIDATA-7f3a9c"
 
 mkdir -p "$WORK/shots" "$WORK/out"
 cd "$WORK"
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
-# --- 1. Testiasetukset ISOon ---------------------------------
-log "Testiasetukset ISOon"
-rm -f cfg.json iso.iso
-xorriso -osirrox on -indev "$ISO_IN" -extract /iRequire/Config/iRequire.json cfg.json >/dev/null 2>&1
-chmod u+w cfg.json
-python3 - "$UPDATE_ROUNDS" <<'EOF'
-import json, sys
-p = 'cfg.json'
-raw = open(p, encoding='utf-8-sig').read()
-c = json.loads(raw)
-c['Tyhjennys']['LaskuriSekuntia'] = 5
-c['Tyhjennys']['MinimikokoGt'] = 20
-c['Tyhjennys']['OdotaVerkkovirtaa'] = False
-c['Paivitykset']['MaksimiKierrokset'] = int(sys.argv[1])
-c['Paivitykset']['VerkonOdotusMinuuttia'] = 3
-c['Asennus']['LopuksiSammutus'] = True
-open(p, 'w', encoding='utf-8').write(json.dumps(c, indent=2, ensure_ascii=True))
-EOF
-# Kayttajan muokattavissa oleva asetustiedosto ei kuulu eheysmanifestiin,
-# joten sen vaihtaminen ei riko tarkistusta - tama testaa myos sen.
-xorriso -indev "$ISO_IN" -outdev iso.iso -boot_image any replay \
-    -map cfg.json /iRequire/Config/iRequire.json -commit >/dev/null 2>&1
-log "ISO valmis: $(du -h iso.iso | cut -f1)"
+# --- 1. ISO ----------------------------------------------------
+# Testiasetukset (lyhyt laskuri, sammutus lopuksi) on asetettu jo
+# Windows-ajossa Set-E2eConfig.ps1:lla ennen ISOn tekoa.
+cp "$ISO_IN" iso.iso
+log "ISO: $(du -h iso.iso | cut -f1)"
 
 # --- 2. Levyt salaisella datalla ------------------------------
 seed_disk() {

@@ -24,6 +24,7 @@ on:
       - 'Policies/defaultuser.txt'
       - 'Policies/Debloat.json'
       - 'Tests/Test-BuildOutput.ps1'
+      - 'Tests/e2e/**'
       - '.github/workflows/build.yml'
 
 env:
@@ -81,11 +82,17 @@ jobs:
           Write-Host ("ISO: {0:N1} Gt" -f ($iso.Length / 1GB))
           if ($iso.Length -lt 1GB) { throw 'ISO on epailyttavan pieni' }
 
-      - name: Siirra ISO paasta paahan -testille (valimuisti)
+      - name: Paasta paahan -testin ISO (sama media, testiasetukset)
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Stop'
+          .\Tests\e2e\Set-E2eConfig.ps1 -MediaDir D:\irq\out\Media
+          # Eheys pysyy: asetukset eivat kuulu manifestiin.
+          . .\Lib\Common.ps1; . .\Lib\Media.ps1
+          $p = Test-MediaManifest -MediaRoot D:\irq\out\Media
+          if ($p.Count -gt 0) { throw ('manifesti: ' + ($p -join '; ')) }
           New-Item -ItemType Directory -Path iso -Force | Out-Null
-          Move-Item D:\irq\out\iRequire.iso iso\iRequire.iso
+          .\Build\New-iRequireIso.ps1 -MediaDir D:\irq\out\Media -IsoPath (Join-Path $PWD 'iso\iRequire.iso')
 
       - uses: actions/cache/save@v4
         with:
@@ -123,7 +130,7 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
           test -e /dev/kvm || { echo 'KVM ei ole kaytettavissa tassa ajurissa'; exit 1; }
           sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf xorriso libguestfs-tools socat netpbm >/dev/null
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf libguestfs-tools socat netpbm >/dev/null
           sudo chmod 0644 /boot/vmlinuz-* || true
           sudo mkdir -p /mnt/e2e && sudo chown "$USER" /mnt/e2e
           df -h /mnt
