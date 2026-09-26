@@ -138,11 +138,12 @@ try {
     Write-IRequireLog ('Asennuskuva: ' + $image.File)
 
     # --- 3. Levyt ---
+    [void](Import-WinPEStorageDrivers -UsbRoot $UsbRoot)
     $usbDisk = Get-UsbBootDiskNumber -UsbRoot $UsbRoot
     $inventory = Get-DiskInventory -ExcludeNumber $usbDisk
     $disks = $inventory.Internal
     if ($disks.Count -eq 0) {
-        Stop-Here 'Sisaisia levyja ei loytynyt. Todennakoisin syy: tallennusohjaimen ajuri puuttuu (Intel RST/VMD). Lisaa ajuri kansioon Build\Drivers\WinPE ja rakenna uudelleen, tai vaihda BIOSista SATA-tilaksi AHCI.'
+        Stop-Here 'Sisaisia levyja ei loytynyt. Todennakoisin syy: tallennusohjaimen ajuri puuttuu (Intel RST/VMD). Helpoin korjaus: kopioi valmistajan ajuri (.inf-kansio) tikun kansioon iRequire\Drivers ja kaynnista uudelleen. Tai vaihda BIOSista VMD pois / SATA-tilaksi AHCI.'
     }
 
     $target = Select-TargetDisk -Disks $disks -MinimumGb ([int]$config.Tyhjennys.MinimikokoGt)

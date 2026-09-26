@@ -89,6 +89,46 @@ function Install-WindowsImage {
     if ($LASTEXITCODE -ne 0) { throw "Kuvan purku epaonnistui (DISM $LASTEXITCODE)" }
 }
 
+function Test-StorageDriverInf {
+    <# Onko INF tallennusohjaimen ajuri (esim. Intel RST/VMD, RAID)? Luokka
+       luetaan [Version]-osiosta. Vain nama ladataan WinPE:hen: koko
+       ajuripaketin lataus olisi hidasta eika levyjen loytamiseen tarvita muita. #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+    $inVersion = $false
+    foreach ($line in ($Text -split "`r?`n")) {
+        $l = ($line -replace ';.*$', '').Trim()
+        if ($l -match '^\[(.+)\]$') { $inVersion = ($Matches[1].Trim() -eq 'Version'); continue }
+        if ($inVersion -and $l -match '^Class\s*=\s*"?([^"\s]+)"?') {
+            return @('SCSIAdapter', 'HDC') -contains $Matches[1]
+        }
+    }
+    return $false
+}
+
+function Import-WinPEStorageDrivers {
+    <# Tikun iRequire\Drivers-kansion tallennusohjainajurit WinPE:hen ennen
+       levyjen etsimista. Nain esim. Intel VMD -kone toimii kun ajurin
+       kopioi tikulle; tikkua ei tarvitse rakentaa uudelleen. #>
+    param([Parameter(Mandatory)][string]$UsbRoot)
+    $dir = Join-Path $UsbRoot 'iRequire\Drivers'
+    if (-not (Test-Path -LiteralPath $dir)) { return 0 }
+    $n = 0
+    foreach ($inf in @(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.inf' })) {
+        $text = ''
+        try { $text = [System.IO.File]::ReadAllText($inf.FullName) } catch { continue }
+        if (-not (Test-StorageDriverInf -Text $text)) { continue }
+        $r = Invoke-Native drvload.exe @($inf.FullName)
+        if ($r.ExitCode -eq 0) { $n++; Write-IRequireLog "WinPE-ajuri ladattu: $($inf.Name)" 'Ok' }
+        else { Write-IRequireLog ("WinPE-ajuria {0} ei voitu ladata (koodi {1})" -f $inf.Name, $r.ExitCode) 'Varoitus' }
+    }
+    if ($n -gt 0) {
+        # Uudet levyt nakyvat vasta kun tallennuspino on paivittynyt.
+        try { Update-HostStorageCache -ErrorAction Stop } catch { }
+        Start-Sleep -Seconds 3
+    }
+    return $n
+}
+
 function Add-MachineDrivers {
     <# Tikun iRequire\Drivers-kansion ajurit lisataan asennukseen. Taalla
        ovat konekohtaiset ajurit, joita ei haluttu leipoa kuvaan. #>

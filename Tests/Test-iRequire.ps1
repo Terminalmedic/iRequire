@@ -123,7 +123,7 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
         'Start-VM','Stop-Service','Unregister-ScheduledTask','Update-MpSignature','Update-Disk',
         'Enable-WindowsOptionalFeature','Get-Tpm','Get-BitLockerVolume','Add-BitLockerKeyProtector',
         'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-MpPreference','Get-NetFirewallProfile',
-        'Confirm-SecureBootUEFI','Set-CimInstance','Get-WindowsPackage',
+        'Confirm-SecureBootUEFI','Set-CimInstance','Get-WindowsPackage','Update-HostStorageCache',
         'Invoke-ScriptAnalyzer')   # Tests\Invoke-Checks.ps1, vain jos moduuli on asennettu
     $defined = @{}
     $calls = @{}
@@ -719,6 +719,17 @@ Test-Case 'Secure Boot 2023: kaynnistystiedostot vaihdetaan kuten Microsoftin sk
         $threw = $false; try { Copy-Ca2023BootFiles -BootRoot $bootRoot -MediaRoot $media | Out-Null } catch { $threw = $true }
         Assert-True $threw 'puuttuva FONTS_EX ei kaatanut'
     } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Test-Case 'WinPE: vain tallennusohjainten ajurit ladataan (Intel VMD tikulta)' {
+    $vmd = "; Intel RST VMD`r`n[Version]`r`nSignature=`"`$WINDOWS NT`$`"`r`nClass=SCSIAdapter`r`nClassGuid={4D36E97B-E325-11CE-BFC1-08002BE10318}`r`nProvider=%INTEL%`r`n"
+    Assert-True (Test-StorageDriverInf -Text $vmd) 'VMD (SCSIAdapter) ei kelvannut'
+    Assert-True (Test-StorageDriverInf -Text "[version]`nClass = HDC ; AHCI") 'HDC ei kelvannut'
+    Assert-True (-not (Test-StorageDriverInf -Text "[Version]`nClass=Net`n")) 'verkkoajuri kelpasi'
+    Assert-True (-not (Test-StorageDriverInf -Text "[Version]`nClass=Display`n[Strings]`nClass=SCSIAdapter")) 'Strings-osion arvo luettiin luokaksi'
+    Assert-True (-not (Test-StorageDriverInf -Text "[Strings]`nClass=SCSIAdapter`n[Version]`nClass=Display")) 'toisen osion Class luettiin ennen Versionia'
+    Assert-True (-not (Test-StorageDriverInf -Text '')) 'tyhja kelpasi'
+    Assert-True (-not (Test-StorageDriverInf -Text "[Version]`n;Class=SCSIAdapter`nClass=Media")) 'kommentoitu rivi luettiin'
 }
 
 Test-Case 'Asennus: bcdboot kokeilee ensin /bootex, varalla tavallinen' {

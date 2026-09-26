@@ -70,7 +70,7 @@ Microsoft vaihtaa Secure Bootin varmenteita (vanhat vanhenevat 2026) ja mitätö
 
 Jos tikku ei käynnisty ja näyttää Secure Boot -virheen, rakenna se uudelleen parametrilla `-SecureBootCA 2023`. Asennettu Windows saa aina uusimman käynnistyksenhallinnan, johon kone luottaa (`bcdboot /bootex`), joten tämä valinta koskee vain tikkua.
 
-Tikun sisältö on tavallisia tiedostoja. Asetukset (`iRequire\Config\iRequire.json`) ja konekohtaiset ajurit (`iRequire\Drivers`) voi muokata suoraan tikulle ilman uudelleenrakennusta. Muita tiedostoja ei voi muokata, koska eheystarkistus hylkää muuttuneen tiedoston.
+Tikun sisältö on tavallisia tiedostoja. Asetukset (`iRequire\Config\iRequire.json`) ja konekohtaiset ajurit (`iRequire\Drivers`, myös WinPE:n tallennusohjainajurit) voi muokata suoraan tikulle ilman uudelleenrakennusta. Muita tiedostoja ei voi muokata, koska eheystarkistus hylkää muuttuneen tiedoston.
 
 ## Asetukset
 
@@ -215,7 +215,7 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 
 | Oire | Syy ja korjaus |
 |---|---|
-| "Sisäisiä levyjä ei löytynyt" | Intel RST/VMD-ohjaimen ajuri puuttuu WinPE:stä. Lisää se kansioon `Build\Drivers\WinPE` ja rakenna uudelleen, tai vaihda BIOSista SATA-tilaksi AHCI. |
+| "Sisäisiä levyjä ei löytynyt" | Intel RST/VMD-ohjaimen ajuri puuttuu WinPE:stä. Helpoin: kopioi koneen valmistajan RST/VMD-ajuri (kansio jossa .inf) tikun kansioon `iRequire\Drivers` ja käynnistä uudelleen. WinPE lataa sieltä tallennusohjainten ajurit ennen levyjen etsimistä, ja sama ajuri menee myös asennettuun Windowsiin. Vaihtoehdot: `Build\Drivers\WinPE` + uudelleenrakennus, tai BIOSista VMD pois / SATA-tila AHCI. |
 | Sisäinen levy näkyy listalla "Ei kosketa (irrotettava levy)" | SATA-portin hot-plug on päällä, joten Windows pitää levyä irrotettavana. iRequire ei tyhjennä irrotettavia levyjä, koska se voisi olla esimerkiksi varmuuskopiolevy. Kytke hot-plug pois BIOSista kyseiseltä portilta. |
 | "Tikun tiedostot ovat vioittuneet" | Kirjoita tikku uudelleen, tai kokeile toista tikkua. |
 | Levy hylätään, eikä sitä voi lukea eikä kirjoittaa | Laitteistosalattu, lukittu levy (Opal/eDrive). Palauta se valmistajan PSID-toiminnolla. |
