@@ -210,6 +210,7 @@ function Test-Deployment {
         "$Windows\iRequire\PostInstall\Invoke-PostInstall.ps1",
         "$Windows\iRequire\Lib\Common.ps1",
         "$Windows\iRequire\Lib\Stages.ps1",
+        "$Windows\iRequire\Lib\Tuning.ps1",
         "$Windows\iRequire\Config\iRequire.json",
         "$Windows\iRequire\Policies\Debloat.json"
     )

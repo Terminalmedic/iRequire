@@ -60,7 +60,10 @@
     "WorkFolders-Client",
     "MicrosoftWindowsPowerShellV2Root",
     "MicrosoftWindowsPowerShellV2",
-    "FaxServicesClientPackage"
+    "FaxServicesClientPackage",
+    "SMB1Protocol",
+    "SMB1Protocol-Client",
+    "SMB1Protocol-Server"
   ],
 
   "_Palvelut": "Palvelut jotka asetetaan Disabled-tilaan. Ei koske Windows Updatea, Defenderia, aanta, Bluetoothia, WLANia eika hakua.",

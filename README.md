@@ -17,9 +17,10 @@ Tikku (WinPE)
 Windows
  ├─ 7. Ryhmäkäytännöt (LGPO → näkyvät gpeditissä), telemetriapalvelut ja -ajastukset pois
  ├─ 8. Turhat sovellukset ja ominaisuudet pois
- ├─ 9. Windows Update + ajurit, kierroksittain uudelleenkäynnistysten yli
- ├─ 10. Visual C++ -kirjastot (pelit), halutessa Firefox. Allekirjoitukset tarkistetaan.
- └─ 11. Yhteenveto: puuttuvat ajurit, näytönohjainsuositus, salasanat pois koneelta
+ ├─ 9. Pelikoneen viritys: virrankäyttö, GPU-ajoitus, Game Mode, tietoturva (ks. alla)
+ ├─ 10. Windows Update + ajurit, kierroksittain uudelleenkäynnistysten yli
+ ├─ 11. Visual C++ ja DirectX-kirjastot, halutessa Firefox. Allekirjoitukset tarkistetaan.
+ └─ 12. Yhteenveto: tietoturvan tila, puuttuvat ajurit, näytönohjainsuositus
 ```
 
 ## Ensimmäinen kerta: näin varmistat että se toimii
@@ -74,9 +75,47 @@ Tikun sisältö on tavallisia tiedostoja. Asetukset (`iRequire\Config\iRequire.j
 | `Tyhjennys.OdotaVerkkovirtaa` | Akulla oleva kannettava odottaa laturia. |
 | `Wlan` | Jos koneessa ei ole kaapelia, päivitykset tarvitsevat tämän. |
 | `Paivitykset` | Kierrosmäärä, ajurit, verkon odotusaika. |
-| `Sovellukset` | Visual C++ (oletus päällä), Firefox (oletus pois). |
+| `Sovellukset` | Visual C++ ja DirectX-lisäkirjastot (oletus päällä), Firefox (oletus pois). |
+| `Suorituskyky` | Virrankäyttö, GPU-ajoitus, ikkunoidut pelit, horrostila, aktiiviset tunnit. |
+| `Tietoturva.BitLocker` | `true` = C: salataan, palautusavain tikulle (ei salausta ilman tikkua). |
 
 Poistettavat sovellukset, palvelut ja ajastukset ovat tiedostossa `Policies\Debloat.json`, ryhmäkäytännöt tiedostoissa `Policies\machine.txt` ja `Policies\user.txt` (LGPO:n tekstimuoto), ja uuden käyttäjän oletusasetukset tiedostossa `Policies\defaultuser.txt`.
+
+## Pelialusta: mitä viritetään ja miksi
+
+Periaate: vain muutoksia, joiden hyöty on mitattu tai Microsoftin dokumentoima. Tietoturvaa ei vaihdeta muutamaan ruudunpäivitykseen.
+
+| Muutos | Miksi |
+|---|---|
+| **Virrankäyttö**: pöytäkone Ultimate Performance, kannettava Balanced + paras suorituskyky laturissa | Ei kellotaajuuden laskua kesken pelin. Kannettavassa Ultimate vain kuumentaisi. |
+| **Laitteistokiihdytetty GPU-ajoitus (HAGS)** | Vaaditaan DLSS Frame Generationiin, pienentää viivettä. |
+| **Ikkunoitujen pelien optimoinnit** | DX10/11-pelit ikkunassa flip-mallilla: pienempi viive, VRR/G-Sync toimii ikkunassa. |
+| **Game Mode** | Windows antaa pelille etusijan ja lykkää päivitysten asennuksen. |
+| **Game DVR / taustatallennus pois** | Taustalla pyörivä videotallennus vie GPU-aikaa. |
+| **Hiiren kiihdytys pois** | Tähtäys on lineaarinen ja toistettava. |
+| **Horrostila pois pöytäkoneelta** | Vapauttaa RAM-muistin kokoisen tiedoston levyltä. |
+| **Käynnistysviive pois** | Windows ei enää pidättele käynnistysohjelmia 10 sekuntia. |
+| **Aktiiviset tunnit 8–02** | Windows Update ei käynnistä konetta uudelleen illalla. |
+| **Defenderin ajastettu tarkistus matalalla prioriteetilla** | Suojaus on ennallaan, eikä taustatarkistus vie ruutuja. |
+| **Toimitusoptimointi pois** | Kone ei jaa päivityksiä muille koneille internetissä, joten lähetyskaista ei kulu. |
+| **Telemetria, mainokset, Copilot, Widgets, Store, Xbox pois** | Vähemmän taustaprosesseja ja verkkoliikennettä. |
+| **.NET 3.5** (kuvassa valmiina), **Visual C++**, **DirectX 9–11 -lisäkirjastot** | Vanhemmat pelit ja niiden asennusohjelmat toimivat heti. |
+
+**Tietoturva pysyy päällä:** Defender, palomuuri, SmartScreen, UAC, Secure Boot ja muistin eheys (HVCI), jos laite tukee. Lisäksi:
+- Defenderin PUA-esto
+- LLMNR pois (salasanojen kalastus lähiverkossa)
+- AutoRun pois (USB-haittaohjelmat)
+- SMB1 pois
+- Etätuki pois
+- Automaattinen laitesalaus estetty, koska sen avain katoaisi paikallisella tilillä. BitLocker on valittavissa asetuksella `Tietoturva.BitLocker`, jolloin avain tallennetaan tikulle.
+
+Testit estävät, ettei mikään näistä kytkeydy vahingossa pois.
+
+**Mitä ei tehdä, tarkoituksella:**
+- **HPET- tai ajastinsäädöt, Nagle-, "network throttling"- ja ydinten "vapautus" -säädöt:** plaseboa tai haitallisia nykyisillä Windows-versioilla.
+- **Muistin eheyden (HVCI) poisto:** voisi antaa muutaman prosentin prosessorisidonnaisissa peleissä, mutta avaisi ytimen ajurihyökkäyksille.
+- **Defenderin poikkeukset pelikansioille:** juuri ladatut pelimodit ja huijausohjelmat ovat yleinen haittaohjelmareitti.
+- **Näytönohjaimen ajuria ei asenneta valmistajalta automaattisesti,** koska lataukset eivät ole vakaita. Windows Update asentaa toimivan ajurin, ja yhteenveto kertoo mistä uusin löytyy.
 
 ## Mitä jätetään rauhaan
 

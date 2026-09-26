@@ -164,3 +164,21 @@ User
 Software\Microsoft\Windows\CurrentVersion\Run
 OneDriveSetup
 DELETE
+
+; --- Kaynnistysohjelmien 10 sekunnin keinotekoinen viive pois ---
+User
+Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize
+StartupDelayInMSec
+DWORD:0
+
+; --- Game Mode paalle (myos jalkiasennus asettaa taman kaikille) ---
+User
+Software\Microsoft\GameBar
+AutoGameModeEnabled
+DWORD:1
+
+; --- Ikkunoitujen pelien optimoinnit (flip model, VRR ikkunassa) ---
+User
+Software\Microsoft\DirectX\UserGpuPreferences
+DirectXUserGlobalSettings
+SZ:SwapEffectUpgradeEnable=1;

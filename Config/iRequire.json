@@ -63,6 +63,27 @@
     "_Firefox": "true = asennetaan Firefox suoraan Mozillalta. Edge jaa joka tapauksessa (tietosuojakaytannoin).",
     "Firefox": false,
     "_VCRedist": "true = Microsoft Visual C++ -ajonaikaiset kirjastot (x64 + x86). Lahes kaikki pelit tarvitsevat naita.",
-    "VCRedist": true
+    "VCRedist": true,
+    "_DirectX": "true = DirectX 9/10/11 -lisakirjastot (d3dx9, XAudio 2.7, XInput 1.3). Vanhemmat pelit tarvitsevat naita, eika Windows sisalla niita.",
+    "DirectX": true
+  },
+
+  "Suorituskyky": {
+    "_Virrankaytto": "auto = poytakone: Ultimate Performance, kannettava: Balanced + paras suorituskyky laturissa. Muut: ultimate, high, balanced.",
+    "Virrankaytto": "auto",
+    "_GpuAjoitus": "Laitteistokiihdytetty GPU-ajoitus (HAGS). Vaaditaan esim. DLSS Frame Generationiin. Ei vaikutusta jos ajuri ei tue.",
+    "GpuAjoitus": true,
+    "_IkkunoidutPelit": "Windows 11:n 'ikkunoitujen pelien optimoinnit': DX10/11-pelit ikkunassa flip-mallilla (pienempi viive, VRR toimii).",
+    "IkkunoidutPelit": true,
+    "_HorrostilaPois": "auto = pois poytakoneelta (vapauttaa RAM-muistin kokoisen tiedoston ja nopeuttaa sammutusta), paalle jaa kannettavassa. true/false pakottaa.",
+    "HorrostilaPois": "auto",
+    "_AktiivisetTunnit": "Windows Update ei kaynnista konetta uudelleen naiden tuntien valilla (0-23). Oletus 8-02: ei kesken pelin illalla.",
+    "AktiivisetTunnitAlku": 8,
+    "AktiivisetTunnitLoppu": 2
+  },
+
+  "Tietoturva": {
+    "_BitLocker": "true = C: salataan BitLockerilla (XTS-AES 128, TPM) ja palautusavain tallennetaan TIKULLE. Jos tikkua ei ole kiinni, salausta ei tehda, jottei avain katoa. Hidastaa NVMe:ta hieman. Automaattinen laitesalaus estetaan aina, koska paikallisella tililla sen avain katoaisi.",
+    "BitLocker": false
   }
 }

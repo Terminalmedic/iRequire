@@ -323,3 +323,65 @@ Computer
 SOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe\DevHomeUpdate
 Blocked
 DWORD:1
+
+; ==============================================================
+;  Tietoturva ilman suorituskykyhaittaa
+; ==============================================================
+
+; --- Defender: estaa ei-toivotut sovellukset (PUA, esim. mainosohjelmat asennusohjelmissa) ---
+Computer
+SOFTWARE\Policies\Microsoft\Windows Defender
+PUAProtection
+DWORD:1
+
+; --- LLMNR pois: yleinen salasanatiivisteiden kalastustapa lahiverkossa ---
+Computer
+SOFTWARE\Policies\Microsoft\Windows NT\DNSClient
+EnableMulticast
+DWORD:0
+
+; --- AutoRun/AutoPlay pois kaikilta asemilta (USB-tikkujen haittaohjelmat) ---
+Computer
+SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer
+NoDriveTypeAutoRun
+DWORD:255
+
+Computer
+SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer
+NoAutorun
+DWORD:1
+
+Computer
+SOFTWARE\Policies\Microsoft\Windows\Explorer
+NoAutoplayfornonVolume
+DWORD:1
+
+; --- Etatuki (Remote Assistance) pois ---
+Computer
+SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services
+fAllowToGetHelp
+DWORD:0
+
+Computer
+SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services
+fAllowUnsolicited
+DWORD:0
+
+; --- Etarekisteri ja nimettomat jaot ---
+Computer
+SYSTEM\CurrentControlSet\Control\Lsa
+RestrictAnonymous
+DWORD:1
+
+; --- Windows Update: ei uudelleenkaynnistysta ilmoittamatta ---
+Computer
+SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU
+AlwaysAutoRebootAtScheduledTime
+DWORD:0
+
+; --- Defenderin ajastettu tarkistus matalalla CPU-prioriteetilla: suojaus
+;     ennallaan, mutta taustatarkistus ei syo kehyksia kesken pelin ---
+Computer
+SOFTWARE\Policies\Microsoft\Windows Defender\Scan
+LowCpuPriority
+DWORD:1

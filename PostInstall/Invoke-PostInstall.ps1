@@ -16,9 +16,10 @@ $ErrorActionPreference = 'Stop'
 $base = Join-Path $env:SystemDrive 'iRequire'
 . (Join-Path $base 'Lib\Common.ps1')
 . (Join-Path $base 'Lib\Stages.ps1')
+. (Join-Path $base 'Lib\Tuning.ps1')
 
 $stateFile = Join-Path $base 'Logs\tila.json'
-$stages = @('Kaytannot', 'Palvelut', 'Poistot', 'Verkko', 'Paivitykset', 'Sovellukset', 'Viimeistely')
+$stages = @('Kaytannot', 'Palvelut', 'Poistot', 'Viritys', 'Verkko', 'Paivitykset', 'Sovellukset', 'Viimeistely')
 
 # Estetaan kaksi samanaikaista ajoa (kaynnistystehtava + SetupCompleten kaynnistys).
 $mutex = New-Object System.Threading.Mutex($false, 'Global\iRequirePostInstall')
@@ -82,17 +83,13 @@ function Invoke-StagePolicies {
         # Varamenetelma: samat arvot suoraan rekisteriin. Toimii, mutta
         # arvot eivat nay gpeditissa kaytantoina.
         Write-IRequireLog 'LGPO.exe puuttuu, kirjoitetaan kaytannot suoraan rekisteriin' 'Varoitus'
-        $userRoots = @(Get-ChildItem -LiteralPath 'Registry::HKEY_USERS' |
-            Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' } |
-            ForEach-Object { 'Registry::HKEY_USERS\' + $_.PSChildName })
-        foreach ($f in $files) {
-            foreach ($e in (Read-PolicyFile -Path $f)) {
-                if ($e.Scope -eq 'Computer') {
-                    Set-PolicyEntry -Entry $e -Root 'HKLM:\'
-                } else {
-                    foreach ($r in $userRoots) { Set-PolicyEntry -Entry $e -Root $r }
-                }
-            }
+        $entries = @()
+        foreach ($f in $files) { $entries += (Read-PolicyFile -Path $f).ToArray() }
+        foreach ($e in @($entries | Where-Object { $_.Scope -eq 'Computer' })) { Set-PolicyEntry -Entry $e -Root 'HKLM:\' }
+        $userEntries = @($entries | Where-Object { $_.Scope -eq 'User' })
+        Invoke-ForEachUserHive {
+            param($root)
+            foreach ($e in $userEntries) { Set-PolicyEntry -Entry $e -Root $root }
         }
     }
     & gpupdate.exe /force /wait:120 2>&1 | ForEach-Object { Write-IRequireLog ("gpupdate: " + $_) }
@@ -219,7 +216,7 @@ function Invoke-StageUpdates {
 
 function Invoke-StageApps {
     param($State)
-    if (-not ($config.Sovellukset.VCRedist -or $config.Sovellukset.Firefox)) { return }
+    if (-not ($config.Sovellukset.VCRedist -or $config.Sovellukset.Firefox -or $config.Sovellukset.DirectX)) { return }
     if (-not (Test-OnlineForStage 'Sovellukset')) { return }
     if ($config.Sovellukset.VCRedist) {
         Set-Status $State 'Asennetaan Visual C++ -kirjastot'
@@ -230,6 +227,13 @@ function Invoke-StageApps {
                     -Arguments '/install /quiet /norestart' -Name "Visual C++ $arch" -OkCodes @(0, 1638, 3010)
             } catch { Write-IRequireLog $_.Exception.Message 'Varoitus' }
         }
+    }
+    if ($config.Sovellukset.DirectX) {
+        Set-Status $State 'Asennetaan DirectX-lisakirjastot'
+        try {
+            Install-SignedInstaller -Url 'https://download.microsoft.com/download/1/7/1/1718CCC4-6315-4D8E-9543-8E28A4E18C4C/dxwebsetup.exe' `
+                -Publisher 'Microsoft Corporation' -Arguments '/Q' -Name 'DirectX-lisakirjastot'
+        } catch { Write-IRequireLog $_.Exception.Message 'Varoitus' }
     }
     if ($config.Sovellukset.Firefox) {
         Set-Status $State 'Asennetaan Firefox'
@@ -325,6 +329,8 @@ function Write-Summary {
         $t.Add('Kaikilla laitteilla on toimiva ajuri.')
     }
     $t.Add('')
+    foreach ($line in (Get-SecuritySummary)) { $t.Add($line) }
+    $t.Add('')
     foreach ($gpu in @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)) {
         $t.Add(('Naytonohjain: {0} (ajuri {1})' -f $gpu.Name, $gpu.DriverVersion))
         # Windows Updaten naytonohjainajuri on toimiva mutta usein vanha. Peleihin kannattaa valmistajan oma.
@@ -380,6 +386,7 @@ $handlers = @{
     'Kaytannot'   = { param($s) Set-Status $s 'Otetaan ryhmakaytannot kayttoon'; Invoke-StagePolicies }
     'Palvelut'    = { param($s) Set-Status $s 'Pysaytetaan telemetriapalvelut ja -ajastukset'; Invoke-StageServices }
     'Poistot'     = { param($s) Set-Status $s 'Poistetaan turhat sovellukset ja ominaisuudet'; Invoke-StageRemovals }
+    'Viritys'     = { param($s) Set-Status $s 'Viritetaan suorituskyky ja tietoturva'; Invoke-StageTuning -Config $config -UsbRoot (Find-UsbStick) }
     'Verkko'      = { param($s) Set-Status $s 'Odotetaan verkkoyhteytta'; Invoke-StageNetwork }
     'Paivitykset' = { param($s) Invoke-StageUpdates -State $s }
     'Sovellukset' = { param($s) Invoke-StageApps -State $s }

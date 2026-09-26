@@ -19,6 +19,13 @@
           <Order>1</Order>
           <Path>reg.exe add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE /v BypassNRO /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
+        <!-- Automaattinen laitesalaus estetaan: paikallisella tililla sen
+             palautusavainta ei tallenneta minnekaan, ja BIOS-paivitys voisi
+             lukita koneen. BitLocker on valinnainen (avain tikulle). -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <Path>reg.exe add HKLM\SYSTEM\CurrentControlSet\Control\BitLocker /v PreventDeviceEncryption /t REG_DWORD /d 1 /f</Path>
+        </RunSynchronousCommand>
       </RunSynchronous>
     </component>
   </settings>

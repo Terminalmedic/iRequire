@@ -61,7 +61,10 @@ function Get-IRequireConfig {
         Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false }
         Wlan        = @{ Ssid = ''; Salasana = '' }
         Paivitykset = @{ MaksimiKierrokset = 6; Ajurit = $true; VerkonOdotusMinuuttia = 10 }
-        Sovellukset = @{ Firefox = $false; VCRedist = $true }
+        Sovellukset = @{ Firefox = $false; VCRedist = $true; DirectX = $true }
+        Suorituskyky = @{ Virrankaytto = 'auto'; GpuAjoitus = $true; IkkunoidutPelit = $true; HorrostilaPois = 'auto'
+                          AktiivisetTunnitAlku = 8; AktiivisetTunnitLoppu = 2 }
+        Tietoturva  = @{ BitLocker = $false }
     }
 
     $json = $null
@@ -156,6 +159,43 @@ function Set-PolicyEntry {
         'DWORD' { New-ItemProperty -LiteralPath $keyPath -Name $Entry.Name -PropertyType DWord -Value ([uint32]$Entry.Value) -Force | Out-Null }
         'SZ'    { New-ItemProperty -LiteralPath $keyPath -Name $Entry.Name -PropertyType String -Value $Entry.Value -Force | Out-Null }
         'EXSZ'  { New-ItemProperty -LiteralPath $keyPath -Name $Entry.Name -PropertyType ExpandString -Value $Entry.Value -Force | Out-Null }
+    }
+}
+
+function Invoke-ForEachUserHive {
+    <# Ajaa $Action jokaisen kayttajan rekisterille (HKU-juuri parametrina):
+       kirjautuneet, kirjautumattomat (NTUSER.DAT ladataan hetkeksi) ja
+       Default-profiili, jotta myos tulevat kayttajat saavat asetuksen. #>
+    param([Parameter(Mandatory)][scriptblock]$Action)
+
+    $targets = New-Object System.Collections.Generic.List[object]
+    $profiles = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList'
+    foreach ($p in @(Get-ChildItem -LiteralPath $profiles -ErrorAction SilentlyContinue)) {
+        if ($p.PSChildName -notmatch '^S-1-5-21-[\d-]+$') { continue }
+        $dir = (Get-ItemProperty -LiteralPath $p.PSPath -ErrorAction SilentlyContinue).ProfileImagePath
+        $hive = if ($dir) { Join-Path $dir 'NTUSER.DAT' } else { '' }
+        $targets.Add([pscustomobject]@{ Sid = $p.PSChildName; Hive = $hive })
+    }
+    $targets.Add([pscustomobject]@{ Sid = 'iRequireDefaultUser'; Hive = (Join-Path $env:SystemDrive 'Users\Default\NTUSER.DAT') })
+
+    foreach ($t in $targets.ToArray()) {
+        $root = 'Registry::HKEY_USERS\' + $t.Sid
+        $loaded = $false
+        if (-not (Test-Path -LiteralPath $root)) {
+            if (-not $t.Hive -or -not (Test-Path -LiteralPath $t.Hive)) { continue }
+            & reg.exe load ('HKU\' + $t.Sid) $t.Hive 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-IRequireLog ("Kayttajan {0} rekisteria ei voitu ladata" -f $t.Sid) 'Varoitus'; continue }
+            $loaded = $true
+        }
+        try {
+            & $Action $root
+        } finally {
+            if ($loaded) {
+                [GC]::Collect()
+                [GC]::WaitForPendingFinalizers()
+                & reg.exe unload ('HKU\' + $t.Sid) 2>&1 | Out-Null
+            }
+        }
     }
 }
 

@@ -26,7 +26,8 @@ param(
     [string]$WorkDir = (Join-Path $PSScriptRoot '..\Out'),
     [string[]]$Edition = @('*IoT Enterprise LTSC*', '*Enterprise LTSC*', '*Pro'),
     [string]$AdkRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\Assessment and Deployment Kit",
-    [switch]$SkipLgpoDownload
+    [switch]$SkipLgpoDownload,
+    [switch]$SkipNetFx3
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +92,16 @@ Write-IRequireLog '3/8 Muokataan asennuskuvaa'
 Mount-WindowsImage -ImagePath $wim -Index 1 -Path $mount | Out-Null
 $saved = $false
 try {
+    # .NET Framework 3.5: moni vanhempi peli ja sen asennusohjelma vaatii
+    # taman. Lisataan ISOn omasta sxs-kansiosta, jolloin verkkoa ei tarvita.
+    # Ennen paivityksia, jotta kumulatiivinen paivitys koskee myos sita.
+    $sxs = Join-Path $media 'sources\sxs'
+    if (-not $SkipNetFx3 -and (Test-Path -LiteralPath $sxs)) {
+        Write-IRequireLog '  .NET Framework 3.5'
+        try { Enable-WindowsOptionalFeature -Path $mount -FeatureName NetFx3 -All -Source $sxs -LimitAccess | Out-Null }
+        catch { Write-IRequireLog ('  .NET 3.5 epaonnistui: ' + $_.Exception.Message) 'Varoitus' }
+    }
+
     $updates = @(Get-ChildItem -LiteralPath (Join-Path $repo 'Build\Updates') -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Extension -in '.msu', '.cab' } | Sort-Object Name)
     foreach ($u in $updates) {

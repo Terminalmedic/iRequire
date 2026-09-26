@@ -38,6 +38,7 @@ Write-Host '=== iRequire-tarkistukset ===' -ForegroundColor Cyan
 . (Join-Path $root 'Lib\Common.ps1')
 . (Join-Path $root 'Lib\Media.ps1')
 . (Join-Path $root 'Lib\Stages.ps1')
+. (Join-Path $root 'Lib\Tuning.ps1')
 . (Join-Path $root 'WinPE\Disk.ps1')
 . (Join-Path $root 'WinPE\Deploy.ps1')
 
@@ -65,7 +66,10 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
         'New-ScheduledTaskTrigger','New-VHD','New-VM','Register-ScheduledTask','Remove-AppxPackage',
         'Remove-AppxProvisionedPackage','Remove-WindowsCapability','Set-Disk','Set-Service','Set-VMFirmware',
         'Set-VMKeyProtector','Set-VMMemory','Set-VMProcessor','Split-WindowsImage','Start-ScheduledTask',
-        'Start-VM','Stop-Service','Unregister-ScheduledTask','Update-MpSignature','Update-Disk')
+        'Start-VM','Stop-Service','Unregister-ScheduledTask','Update-MpSignature','Update-Disk',
+        'Enable-WindowsOptionalFeature','Get-Tpm','Get-BitLockerVolume','Add-BitLockerKeyProtector',
+        'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-NetFirewallProfile',
+        'Confirm-SecureBootUEFI')
     $defined = @{}
     $calls = @{}
     foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.ps1)) {
@@ -291,7 +295,7 @@ Test-Case 'Asennuksen lopputarkistus huomaa puuttuvan tiedoston' {
     try {
         $files = @("$w\Windows\System32\config\SYSTEM", "$w\Windows\System32\winload.efi", "$w\Windows\Panther\unattend.xml",
                    "$w\Windows\Setup\Scripts\SetupComplete.cmd", "$w\iRequire\PostInstall\Invoke-PostInstall.ps1",
-                   "$w\iRequire\Lib\Common.ps1", "$w\iRequire\Lib\Stages.ps1", "$w\iRequire\Config\iRequire.json", "$w\iRequire\Policies\Debloat.json",
+                   "$w\iRequire\Lib\Common.ps1", "$w\iRequire\Lib\Stages.ps1", "$w\iRequire\Lib\Tuning.ps1", "$w\iRequire\Config\iRequire.json", "$w\iRequire\Policies\Debloat.json",
                    "$sy\EFI\Microsoft\Boot\bootmgfw.efi", "$sy\EFI\Microsoft\Boot\BCD")
         foreach ($f in $files) { New-Item -ItemType File -Path $f -Force | Out-Null }
         Test-Deployment -Windows $w -System $sy -Firmware UEFI
@@ -468,6 +472,57 @@ Test-Case 'Jalkiasennus: jokaisella vaiheella on kasittelija ja paivitykset enne
     Assert-True ([Array]::IndexOf($names, 'Verkko') -lt [Array]::IndexOf($names, 'Paivitykset')) 'Verkko paivitysten jalkeen'
 }
 
+Test-Case 'Viritys: virrankaytto koneen tyypin mukaan' {
+    Assert-True ((Get-PowerPlanChoice -Setting 'auto' -HasBattery $false) -eq 'Ultimate') 'Poytakone'
+    Assert-True ((Get-PowerPlanChoice -Setting 'auto' -HasBattery $true) -eq 'Balanced') 'Kannettava'
+    Assert-True ((Get-PowerPlanChoice -Setting 'HIGH' -HasBattery $true) -eq 'High') 'Pakotettu high'
+    Assert-True ((Get-PowerPlanChoice -Setting 'ultimate' -HasBattery $true) -eq 'Ultimate') 'Pakotettu ultimate'
+    Assert-True ((Get-PowerPlanChoice -Setting 'hassu' -HasBattery $false) -eq 'Ultimate') 'Tuntematon -> auto'
+}
+
+Test-Case 'Viritys: horrostila pois vain poytakoneelta ellei pakoteta' {
+    Assert-True (Get-HibernateChoice -Setting 'auto' -HasBattery $false) 'Poytakone'
+    Assert-True (-not (Get-HibernateChoice -Setting 'auto' -HasBattery $true)) 'Kannettava'
+    Assert-True (Get-HibernateChoice -Setting $true -HasBattery $true) 'Pakotettu pois'
+    Assert-True (-not (Get-HibernateChoice -Setting $false -HasBattery $false)) 'Pakotettu paalle'
+    Assert-True (Get-HibernateChoice -Setting 'true' -HasBattery $true) 'Merkkijono true'
+}
+
+Test-Case 'Viritys: aktiiviset tunnit enintaan 18 h' {
+    Assert-True (Test-ActiveHours -Start 8 -End 2) '8-02 = 18 h'
+    Assert-True (Test-ActiveHours -Start 9 -End 17) '9-17'
+    Assert-True (-not (Test-ActiveHours -Start 8 -End 3)) '8-03 = 19 h'
+    Assert-True (-not (Test-ActiveHours -Start 5 -End 5)) 'sama tunti'
+    Assert-True (-not (Test-ActiveHours -Start 24 -End 2)) 'yli 23'
+    $cfg = Get-IRequireConfig -Path (Join-Path $root 'Config\iRequire.json')
+    Assert-True (Test-ActiveHours -Start $cfg.Suorituskyky.AktiivisetTunnitAlku -End $cfg.Suorituskyky.AktiivisetTunnitLoppu) 'Oletusasetus ei kelpaa'
+}
+
+Test-Case 'Tietoturva: vastaustiedosto estaa automaattisen laitesalauksen' {
+    $cfg = Get-IRequireConfig -Path (Join-Path $root 'Config\iRequire.json')
+    $xml = New-UnattendXml -TemplatePath (Join-Path $root 'Unattend\unattend.template.xml') -Config $cfg
+    Assert-True ($xml -match 'PreventDeviceEncryption /t REG_DWORD /d 1') 'PreventDeviceEncryption puuttuu'
+}
+
+Test-Case 'Tietoturva: suojaus ei heikkene (Defender, palomuuri, UAC, SmartScreen, VBS)' {
+    $all = @()
+    foreach ($f in @('machine.txt', 'user.txt', 'defaultuser.txt')) { $all += (Read-PolicyFile -Path (Join-Path $root "Policies\$f")).ToArray() }
+    $forbidden = @(
+        @{ Name = 'DisableAntiSpyware' }, @{ Name = 'DisableRealtimeMonitoring' }, @{ Name = 'EnableLUA'; Value = '0' },
+        @{ Name = 'EnableSmartScreen'; Value = '0' }, @{ Name = 'EnableFirewall'; Value = '0' },
+        @{ Name = 'EnableVirtualizationBasedSecurity'; Value = '0' }, @{ Name = 'HypervisorEnforcedCodeIntegrity'; Value = '0' },
+        @{ Name = 'NoAutoUpdate'; Value = '1' }, @{ Name = 'DisableWindowsUpdateAccess'; Value = '1' }
+    )
+    foreach ($f in $forbidden) {
+        $hit = @($all | Where-Object { $_.Name -eq $f.Name -and (-not $f.Value -or $_.Value -eq $f.Value) })
+        Assert-True ($hit.Count -eq 0) ("Kielletty asetus: {0}" -f $f.Name)
+    }
+    $d = Get-Content -LiteralPath (Join-Path $root 'Policies\Debloat.json') -Raw | ConvertFrom-Json
+    foreach ($svc in @('WinDefend', 'mpssvc', 'SecurityHealthService', 'wscsvc', 'Sense', 'WdNisSvc')) {
+        Assert-True ($d.Palvelut -notcontains $svc) "Tietoturvapalvelu $svc poistolistalla"
+    }
+}
+
 Test-Case 'Tilakone: kaikki vaiheet kerran, yksi kaynnistys' {
     $script:Calls = New-Object System.Collections.Generic.List[string]
     $h = @{ 'A' = { $script:Calls.Add('A') }; 'Paivitykset' = { $script:Calls.Add('P') }; 'B' = { $script:Calls.Add('B') } }
@@ -527,7 +582,7 @@ Test-Case 'Tilakone: vioittunut vaihe tilatiedostossa aloittaa alusta' {
     $script:Calls = New-Object System.Collections.Generic.List[string]
     $h = @{ 'A' = { $script:Calls.Add('A') }; 'Paivitykset' = { $script:Calls.Add('P') }; 'B' = { $script:Calls.Add('B') } }
     $bad = [pscustomobject]@{ Vaihe = 'EiOlemassa'; Kierros = 99; Valmis = $false }
-    $r = Invoke-SimulatedBoots -Stages $simStages -Handlers $h -State $bad
+    [void](Invoke-SimulatedBoots -Stages $simStages -Handlers $h -State $bad)
     Assert-True (($script:Calls -join '') -eq 'APB') "Jarjestys $($script:Calls -join '') (viimeinen vaihe ajettiin ensin?)"
 }
 
@@ -540,7 +595,7 @@ Test-Case 'Tilakone: vaiheen muu tuloste ei tulkitu uudelleenkaynnistyspyynnoksi
 Test-Case 'Tilakone: valmis tila ei aja mitaan' {
     $script:Calls = New-Object System.Collections.Generic.List[string]
     $h = @{ 'A' = { $script:Calls.Add('A') }; 'Paivitykset' = { }; 'B' = { } }
-    $r = Invoke-SimulatedBoots -Stages $simStages -Handlers $h -State ([pscustomobject]@{ Vaihe = 'A'; Valmis = $true })
+    [void](Invoke-SimulatedBoots -Stages $simStages -Handlers $h -State ([pscustomobject]@{ Vaihe = 'A'; Valmis = $true }))
     Assert-True ($script:Calls.Count -eq 0) 'Valmis tila ajoi vaiheita'
 }
 

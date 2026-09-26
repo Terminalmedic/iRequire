@@ -1,7 +1,6 @@
 name: CI
 
-# Tama tiedosto alkaa toimia kun iRequire siirretaan omaksi repokseen.
-# Siihen asti samat tarkistukset ajetaan USB--repon CI:ssa.
+# Ajetaan oikealla Windowsilla (PowerShell 5.1, sama kuin WinPE:ssa).
 on:
   push:
     branches: ['**']
