@@ -77,7 +77,7 @@ function Get-IRequireConfig {
         Asennus     = @{ Tuoteavain = ''; AutomaattikirjautuminenPysyva = $false; LopuksiSammutus = $false; LokiSarjaporttiin = $false }
         Wlan        = @{ Ssid = ''; Salasana = '' }
         Paivitykset = @{ MaksimiKierrokset = 6; Ajurit = $true; VerkonOdotusMinuuttia = 10 }
-        Sovellukset = @{ Firefox = $false; VCRedist = $true; DirectX = $true }
+        Sovellukset = @{ Firefox = $false; VCRedist = $true; DirectX = $true; Steam = $false }
         Suorituskyky = @{ Virrankaytto = 'auto'; GpuAjoitus = $true; IkkunoidutPelit = $true; HorrostilaPois = 'auto'
                           AktiivisetTunnitAlku = 8; AktiivisetTunnitLoppu = 2 }
         Tietoturva  = @{ BitLocker = $false }

@@ -19,7 +19,7 @@ Windows
  ├─ 8. Turhat sovellukset ja ominaisuudet pois
  ├─ 9. Pelikoneen viritys: virrankäyttö, GPU-ajoitus, Game Mode, tietoturva (ks. alla)
  ├─ 10. Windows Update + ajurit, kierroksittain uudelleenkäynnistysten yli
- ├─ 11. Visual C++ ja DirectX-kirjastot, halutessa Firefox. Allekirjoitukset tarkistetaan.
+ ├─ 11. Visual C++ ja DirectX-kirjastot, halutessa Firefox ja Steam. Allekirjoitukset tarkistetaan.
  ├─ 12. Yhteenveto: pelikuntoraportti (XMP, dual channel, näyttökaapeli ...), tietoturvan tila
  └─ 13. Kirjautuessa: näytöt suurimmalle virkistystaajuudelle
 ```
@@ -91,7 +91,7 @@ Tikun sisältö on tavallisia tiedostoja. Asetukset (`iRequire\Config\iRequire.j
 | `Tyhjennys.OdotaVerkkovirtaa` | Akulla oleva kannettava odottaa laturia. |
 | `Wlan` | Jos koneessa ei ole kaapelia, päivitykset tarvitsevat tämän. |
 | `Paivitykset` | Kierrosmäärä, ajurit, verkon odotusaika. |
-| `Sovellukset` | Visual C++ ja DirectX-lisäkirjastot (oletus päällä), Firefox (oletus pois). |
+| `Sovellukset` | Visual C++ ja DirectX-lisäkirjastot (oletus päällä), Firefox ja Steam (oletus pois). |
 | `Suorituskyky` | Virrankäyttö, GPU-ajoitus, ikkunoidut pelit, horrostila, aktiiviset tunnit. |
 | `Tietoturva.BitLocker` | `true` = C: salataan, palautusavain tikulle (ei salausta ilman tikkua). |
 

@@ -218,7 +218,7 @@ function Invoke-StageUpdates {
 
 function Invoke-StageApps {
     param($State)
-    if (-not ($config.Sovellukset.VCRedist -or $config.Sovellukset.Firefox -or $config.Sovellukset.DirectX)) { return }
+    if (-not ($config.Sovellukset.VCRedist -or $config.Sovellukset.Firefox -or $config.Sovellukset.DirectX -or $config.Sovellukset.Steam)) { return }
     if (-not (Test-OnlineForStage 'Sovellukset')) { return }
     if ($config.Sovellukset.VCRedist) {
         Set-Status $State 'Asennetaan Visual C++ -kirjastot'
@@ -242,6 +242,15 @@ function Invoke-StageApps {
         try {
             Install-SignedInstaller -Url 'https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=fi' `
                 -Publisher 'Mozilla Corporation' -Arguments '/S' -Name 'Firefox'
+        } catch { Write-IRequireLog $_.Exception.Message 'Varoitus' }
+    }
+    if ($config.Sovellukset.Steam) {
+        # Konekohtainen asennus (Program Files); Steam paivittaa itsensa
+        # ensimmaisella kaynnistyksella kayttajan istunnossa.
+        Set-Status $State 'Asennetaan Steam'
+        try {
+            Install-SignedInstaller -Url 'https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe' `
+                -Publisher 'Valve' -Arguments '/S' -Name 'Steam'
         } catch { Write-IRequireLog $_.Exception.Message 'Varoitus' }
     }
 }
