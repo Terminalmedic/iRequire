@@ -124,6 +124,7 @@ Test-Case 'Jokainen kutsuttu funktio on olemassa (kirjoitusvirheet)' {
         'Enable-WindowsOptionalFeature','Get-Tpm','Get-BitLockerVolume','Add-BitLockerKeyProtector',
         'Remove-BitLockerKeyProtector','Enable-BitLocker','Get-MpComputerStatus','Get-MpPreference','Get-NetFirewallProfile',
         'Confirm-SecureBootUEFI','Set-CimInstance','Get-WindowsPackage','Update-HostStorageCache',
+        'Get-SecureBootUEFI','Get-PnpDeviceProperty',
         'Invoke-ScriptAnalyzer')   # Tests\Invoke-Checks.ps1, vain jos moduuli on asennettu
     $defined = @{}
     $calls = @{}
@@ -719,6 +720,32 @@ Test-Case 'Secure Boot 2023: kaynnistystiedostot vaihdetaan kuten Microsoftin sk
         $threw = $false; try { Copy-Ca2023BootFiles -BootRoot $bootRoot -MediaRoot $media | Out-Null } catch { $threw = $true }
         Assert-True $threw 'puuttuva FONTS_EX ei kaatanut'
     } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Test-Case 'Esitarkistus: Secure Boot -varmenteen valinta (KB5025885)' {
+    $a = Get-SecureBootCaAdvice -SecureBoot 'On' -Db2023 $true -Pca2011Revoked $true
+    Assert-True ($a.Ca -eq '2023' -and $a.Varma) "mitatoity: $($a.Ca)"
+    $a = Get-SecureBootCaAdvice -SecureBoot 'On' -Db2023 $false -Pca2011Revoked $false
+    Assert-True ($a.Ca -eq '2011' -and $a.Varma) "ei 2023-varmennetta: $($a.Ca)"
+    $a = Get-SecureBootCaAdvice -SecureBoot 'On' -Db2023 $true -Pca2011Revoked $false
+    Assert-True ($a.Ca -eq 'Kumpi tahansa' -and $a.Varma) "molemmat: $($a.Ca)"
+    $a = Get-SecureBootCaAdvice -SecureBoot 'Off'
+    Assert-True ($a.Ca -eq 'Kumpi tahansa' -and $a.Varma) "SB pois: $($a.Ca)"
+    $a = Get-SecureBootCaAdvice -SecureBoot 'On'
+    Assert-True ($a.Ca -eq '2011' -and -not $a.Varma) "tuntematon: $($a.Ca)"
+    $a = Get-SecureBootCaAdvice
+    Assert-True (-not $a.Varma) 'tuntematon SB-tila ei saa olla varma'
+    # Mitatointi voittaa aina: 2011-tikku ei kaynnisty, vaikka DB-tietoa ei olisi.
+    $a = Get-SecureBootCaAdvice -SecureBoot 'On' -Pca2011Revoked $true
+    Assert-True ($a.Ca -eq '2023') "mitatoity, DB tuntematon: $($a.Ca)"
+}
+
+Test-Case 'Esitarkistus: vain valmistajan levyohjainajurit viedaan tikulle' {
+    Assert-True (Test-ThirdPartyStorageDriver -InfPath 'oem12.inf' -Class 'SCSIAdapter') 'VMD (oem, SCSIAdapter)'
+    Assert-True (Test-ThirdPartyStorageDriver -InfPath 'oem3.inf' -Class 'HDC') 'RST (oem, HDC)'
+    Assert-True (-not (Test-ThirdPartyStorageDriver -InfPath 'stornvme.inf' -Class 'SCSIAdapter')) 'Windowsin NVMe-ajuri'
+    Assert-True (-not (Test-ThirdPartyStorageDriver -InfPath 'oem7.inf' -Class 'Display')) 'naytonohjain'
+    Assert-True (-not (Test-ThirdPartyStorageDriver -InfPath '' -Class 'HDC')) 'tuntematon inf'
 }
 
 Test-Case 'Turvallisuus: harjoitustila pysahtyy ennen yhtakaan kirjoittavaa kutsua' {

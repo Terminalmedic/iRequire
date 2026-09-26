@@ -167,3 +167,39 @@ function Get-GamingInputs {
     } catch { }
     return [pscustomobject]@{ Memory = $mem; Gpus = $gpus; HasBattery = $battery; SystemDiskKind = $kind; SecureBoot = $sb; Tpm = $tpm }
 }
+
+function Get-SecureBootCaAdvice {
+    <# Kumpi Secure Boot -varmenne tikulle (Build-iRequire.ps1 -SecureBootCA)?
+       Puhdas paatos: syotteet keraa Tools\Test-TargetMachine.ps1.
+       KB5025885: kun 'Microsoft Windows Production PCA 2011' on DBX:ssa,
+       2011-allekirjoitettu tikku ei kaynnisty. 2023-tikku vaatii etta
+       'Windows UEFI CA 2023' on DB:ssa. #>
+    param(
+        [ValidateSet('', 'On', 'Off', 'Legacy')][string]$SecureBoot = '',
+        $Db2023 = $null,            # $true / $false / $null (ei tiedossa)
+        $Pca2011Revoked = $null
+    )
+    if ($SecureBoot -ne 'On') {
+        $why = if ($SecureBoot -eq '') { 'Secure Bootin tilaa ei saatu (aja jarjestelmanvalvojana).' } else { 'Secure Boot ei ole paalla, joten allekirjoitusta ei tarkisteta.' }
+        return [pscustomobject]@{ Ca = 'Kumpi tahansa'; Varma = ($SecureBoot -ne ''); Syy = $why }
+    }
+    if ($Pca2011Revoked -eq $true) {
+        return [pscustomobject]@{ Ca = '2023'; Varma = $true; Syy = 'Vanhat kaynnistyksenhallinnat on mitatoity tassa koneessa: 2011-tikku ei kaynnisty.' }
+    }
+    if ($Db2023 -eq $false) {
+        return [pscustomobject]@{ Ca = '2011'; Varma = $true; Syy = "Laiteohjelmisto ei viela luota 'Windows UEFI CA 2023' -varmenteeseen: 2023-tikku ei kaynnisty." }
+    }
+    if ($Db2023 -eq $true -and $Pca2011Revoked -eq $false) {
+        return [pscustomobject]@{ Ca = 'Kumpi tahansa'; Varma = $true; Syy = 'Kone luottaa molempiin. 2023 on tulevaisuudenkestavampi.' }
+    }
+    return [pscustomobject]@{ Ca = '2011'; Varma = $false; Syy = 'Varmenteiden tilaa ei saatu kokonaan selville. 2011 toimii useimmissa koneissa; jos tikku ei kaynnisty, rakenna -SecureBootCA 2023.' }
+}
+
+function Test-ThirdPartyStorageDriver {
+    <# Tarvitaanko tallennusohjaimelle ajuri tikulle? Windowsin omat ajurit
+       (stornvme, storahci ...) ovat myos WinPE:ssa; kolmannen osapuolen
+       (oemNN.inf, esim. Intel RST/VMD) eivat. #>
+    param([string]$InfPath, [string]$Class)
+    if (@('SCSIAdapter', 'HDC') -notcontains $Class) { return $false }
+    return ($InfPath -match '^oem\d+\.inf$')
+}

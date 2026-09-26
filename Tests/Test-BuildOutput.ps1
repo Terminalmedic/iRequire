@@ -43,7 +43,8 @@ Check 'iRequire-kansio, merkki ja eheysmanifesti' {
     Assert-True (Test-Path -LiteralPath (Join-Path $MediaDir 'iRequire\iRequire.tag')) 'iRequire.tag puuttuu'
     foreach ($f in @('WinPE\Start-iRequire.ps1', 'WinPE\Disk.ps1', 'WinPE\Deploy.ps1', 'PostInstall\Invoke-PostInstall.ps1',
                      'Lib\Common.ps1', 'Lib\Stages.ps1', 'Lib\Tuning.ps1', 'Lib\Media.ps1', 'Lib\Display.ps1', 'Lib\Readiness.ps1',
-                     'Unattend\unattend.template.xml', 'Config\iRequire.json', 'Policies\machine.txt')) {
+                     'Unattend\unattend.template.xml', 'Config\iRequire.json', 'Policies\machine.txt',
+                     'Tools\Test-TargetMachine.ps1')) {
         Assert-True (Test-Path -LiteralPath (Join-Path $MediaDir "iRequire\$f")) "puuttuu iRequire\$f"
     }
     $problems = Test-MediaManifest -MediaRoot $MediaDir

@@ -28,6 +28,10 @@ Windows
 
 Levyn tyhjennys on peruuttamaton, joten ennen oikeaa konetta käy nämä vaiheet läpi järjestyksessä:
 
+0. **Esitarkistus kohdekoneella** (jos siinä on vielä toimiva Windows): aja järjestelmänvalvojana tikulta `iRequire\Tools\Test-TargetMachine.ps1`. Se ei muuta konetta, ja kertoo:
+   - kumpi Secure Boot -varmenne tikulle tarvitaan (ks. alla)
+   - tarvitseeko levyohjain valmistajan ajurin (Intel RST/VMD). `-ExportDrivers` vie sen suoraan tikulle.
+   - TPM, Secure Boot, RAM, näytöt ja levyt, jotka tyhjennettäisiin
 1. **Testit:** `.\Tests\Test-iRequire.ps1`. Kaikkien 30+ tarkistuksen pitää mennä läpi.
 2. **Virtuaalikone:** `.\Build\New-iRequireIso.ps1` ja sitten `.\Tests\New-TestVm.ps1 -IsoPath .\Out\iRequire.iso`. Hyper-V-kone saa kaksi levyä täynnä testidataa. Anna ketjun ajaa loppuun ja tarkista `C:\iRequire\Reports`.
 3. **Harjoitus oikealla koneella:** aseta tikulla `iRequire\Config\iRequire.json` → `"Harjoitus": true`. Tikku tekee kaiken muun (eheys, levyjen tunnistus, suora luku, kohdelevyn valinta), mutta ei kirjoita levyille mitään. Tulos on lokissa `iRequire\Reports`.
