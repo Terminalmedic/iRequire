@@ -247,7 +247,10 @@ Jos levyllä on ollut jotain todella arkaluontoista eikä laitteen oma tyhjennys
 | Sisäinen levy näkyy listalla "Ei kosketa (irrotettava levy)" | SATA-portin hot-plug on päällä, joten Windows pitää levyä irrotettavana. iRequire ei tyhjennä irrotettavia levyjä, koska se voisi olla esimerkiksi varmuuskopiolevy. Kytke hot-plug pois BIOSista kyseiseltä portilta. |
 | "Tikun tiedostot ovat vioittuneet" | Kirjoita tikku uudelleen, tai kokeile toista tikkua. |
 | Levy hylätään, eikä sitä voi lukea eikä kirjoittaa | Laitteistosalattu, lukittu levy (Opal/eDrive). Palauta se valmistajan PSID-toiminnolla. |
-| Secure Boot -virhe tikulta käynnistettäessä | Laiteohjelmisto on hylännyt vanhan varmenteen. Rakenna media uudemmasta ISOsta, tai kytke Secure Boot pois asennuksen ajaksi. |
+| Secure Boot -virhe tikulta käynnistettäessä ("Secure Boot violation") | Koneessa on mitätöity vanhat käynnistyksenhallinnat. Rakenna tikku parametrilla `-SecureBootCA 2023` (ks. [Secure Boot -varmenne](#secure-boot--varmenne-2011-vai-2023)); esitarkistus `Tools\Test-TargetMachine.ps1` kertoo tämän etukäteen. Secure Bootia ei tarvitse kytkeä pois. |
+| "Asetustiedostossa ... on virheitä" | Ruutu listaa virheet (esim. avaimen kirjoitusvirhe tai `"false"` lainausmerkeissä). Korjaa `iRequire\Config\iRequire.json` tikulla ja käynnistä uudelleen. Levyihin ei ole koskettu. |
+| "iRequire pysähtyi odottamatta" | Odottamaton virhe WinPE:ssä. Loki on tikun kansiossa `iRequire\Reports`. Kone ei käynnisty uudelleen itsestään, jotta tikku ei aloita alusta. |
+| Yhteenvedossa "OHITETUT VAIHEET" | Jälkiasennuksen vaihe epäonnistui kahdesti. Virhe näkyy yhteenvedossa, tarkemmin `C:\iRequire\Logs\postinstall.log`. Useimmiten syy on verkko: aja iRequire uudelleen verkkokaapelilla. |
 | Ei verkkoa asennuksen jälkeen | WLAN-ajuri puuttuu. `yhteenveto.txt` listaa laitteen. Lisää ajuri tikun kansioon `iRequire\Drivers` tai käytä kaapelia. |
 
 ## Versio ja lisenssi
